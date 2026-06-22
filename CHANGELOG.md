@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.2.2] - 2026-06-22
+
+### Changed
+
+- Hardened transcript cleanup and improved transcript/clipboard reliability around edge-case browser behavior.
+- Improved ZIP extraction messaging and source-repo handling confidence without weakening extraction safety protections.
+- Reduced repeated web-app feedback logic through small helper extraction while keeping the existing app architecture intact.
+- Split large frontend vendor bundles to remove the previous Vite chunk-size warning and improve build health.
+
+### Fixed
+
+- Improved handling of transcript terminal artifacts in automated coverage.
+- Improved consistency of copy feedback across transcript, preview, diff, and path-copy actions.
+
+### Tests
+
+- Verified server test suite: 66 passing tests.
+- Verified web test suite: 78 passing tests.
+- Verified typecheck and production build.
+
 ## [0.2.1] - 2026-06-22
 
 ### Changed
