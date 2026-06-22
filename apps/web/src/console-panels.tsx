@@ -108,6 +108,11 @@ export function ProjectControls({
   onRepoPathChange,
   onChooseRepo,
   repoPickerMessage,
+  projectMessage,
+  createProjectOptions,
+  onCreateProjectOptionChange,
+  onCreateProject,
+  isCreatingProject,
   onStartSession,
   onStopSession,
   connectionStateLabel,
@@ -143,6 +148,60 @@ export function ProjectControls({
       </p>
       <p className="helper-text">Good examples: `/home/you/my-app` or `/home/you/projects/api-service`. Avoid broad parent folders like `/home/you/Projects`.</p>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
+      <div className="project-create-card">
+        <div className="project-create-header">
+          <strong>Create new project</strong>
+          <span className="helper-text">Use the same path above to make a new folder before starting Codex.</span>
+        </div>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={createProjectOptions.createFolder}
+            onChange={(event) =>
+              onCreateProjectOptionChange({
+                ...createProjectOptions,
+                createFolder: event.target.checked
+              })
+            }
+          />
+          <span>Create folder</span>
+        </label>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={createProjectOptions.initializeGit}
+            onChange={(event) =>
+              onCreateProjectOptionChange({
+                ...createProjectOptions,
+                initializeGit: event.target.checked
+              })
+            }
+          />
+          <span>Initialize Git repository</span>
+        </label>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={createProjectOptions.createReadme}
+            onChange={(event) =>
+              onCreateProjectOptionChange({
+                ...createProjectOptions,
+                createReadme: event.target.checked
+              })
+            }
+          />
+          <span>Create README.md</span>
+        </label>
+        <button
+          type="button"
+          className="secondary"
+          onClick={onCreateProject}
+          disabled={isCreatingProject || status.active || !repoPath.trim()}
+        >
+          {isCreatingProject ? "Creating project..." : "Create new project"}
+        </button>
+        {projectMessage ? <p className="success-banner compact-success">{projectMessage}</p> : null}
+      </div>
       <div className="control-actions">
         <button type="button" onClick={onStartSession} disabled={status.active || !repoPath.trim()}>
           Start session

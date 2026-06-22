@@ -117,6 +117,7 @@ function installFetchMock(overrides?: {
   sessions?: unknown;
   gitStatus?: unknown;
   documents?: { ok: boolean; payload: unknown };
+  projects?: { ok: boolean; payload: unknown };
 }) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     if (input === "/api/settings") {
@@ -163,6 +164,19 @@ function installFetchMock(overrides?: {
       );
     }
 
+    if (input === "/api/projects" && init?.method === "POST") {
+      return createFetchResponse(
+        overrides?.projects?.payload ?? {
+          repoPath: "/workspace/new-project",
+          createdFolder: true,
+          initializedGit: true,
+          createdReadme: true,
+          message: "Project created at /workspace/new-project: created the folder, initialized Git, added README.md."
+        },
+        overrides?.projects?.ok ?? true
+      );
+    }
+
     throw new Error(`Unhandled fetch request: ${input}`);
   });
 
@@ -175,6 +189,8 @@ function renderApp(options?: {
   recentProjects?: unknown;
   sessions?: unknown;
   gitStatus?: unknown;
+  documents?: { ok: boolean; payload: unknown };
+  projects?: { ok: boolean; payload: unknown };
 }) {
   installFetchMock(options);
   render(<App />);
@@ -233,6 +249,21 @@ describe("App integration", () => {
 
     expect(await screen.findByText(REPO_PICKER_UNSUPPORTED_MESSAGE)).toBeTruthy();
     expect(screen.getByText(/Manual path entry is fully supported/i)).toBeTruthy();
+  });
+
+  it("creates a new project folder and reuses the chosen path for session start", async () => {
+    renderApp();
+
+    fireEvent.change(screen.getByLabelText("Project folder path"), {
+      target: {
+        value: "/workspace/new-project"
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create new project" }));
+
+    expect(await screen.findByText(/Project created at \/workspace\/new-project/i)).toBeTruthy();
+    expect((screen.getByLabelText("Project folder path") as HTMLInputElement).value).toBe("/workspace/new-project");
   });
 
   it("walks the session banner through idle, starting, running, stopping, and stopped states", async () => {
@@ -354,6 +385,28 @@ describe("App integration", () => {
     const repoPathMessages = await screen.findAllByText(/That project folder does not exist yet/i);
     expect(repoPathMessages.length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText(/Technical details: The path does not exist: \/workspace\/missing-project/i)).toBeTruthy();
+  });
+
+  it("shows create-project failures clearly without overwriting the current path", async () => {
+    renderApp({
+      projects: {
+        ok: false,
+        payload: {
+          error: "That folder already exists and is not empty. Choose a new folder path instead so existing data is not overwritten."
+        }
+      }
+    });
+
+    fireEvent.change(screen.getByLabelText("Project folder path"), {
+      target: {
+        value: "/workspace/existing-project"
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create new project" }));
+
+    expect(await screen.findByText(/already exists and is not empty/i)).toBeTruthy();
+    expect((screen.getByLabelText("Project folder path") as HTMLInputElement).value).toBe("/workspace/existing-project");
   });
 
   it("shows clear guidance when the selected folder looks like a broad parent directory", async () => {

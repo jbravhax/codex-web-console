@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { validateInspectableDirectoryPath, validateRepoPath } from "./repo-paths.js";
+import { validateInspectableDirectoryPath, validateNewProjectPath, validateRepoPath } from "./repo-paths.js";
 
 const createdPaths: string[] = [];
 
@@ -65,5 +65,23 @@ describe("repo path validation", () => {
 
   it("rejects /home without a subdirectory", () => {
     expect(() => validateInspectableDirectoryPath("/home")).toThrow("specific folder inside /home");
+  });
+
+  it("accepts a new project path when the parent folder exists", () => {
+    const parentPath = makeTempDir("codex-web-new-parent-");
+    const repoPath = path.join(parentPath, "new-project");
+
+    expect(validateNewProjectPath(repoPath)).toBe(repoPath);
+  });
+
+  it("rejects existing non-empty folders for new project creation", () => {
+    const repoPath = makeTempDir("codex-web-existing-project-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Existing\n", "utf8");
+
+    expect(() => validateNewProjectPath(repoPath)).toThrow("already exists and is not empty");
+  });
+
+  it("rejects unsafe new project paths", () => {
+    expect(() => validateNewProjectPath("/etc/new-project")).toThrow("Refusing to create a project");
   });
 });

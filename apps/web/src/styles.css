@@ -360,6 +360,38 @@ textarea {
   align-items: center;
 }
 
+.project-create-card {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
+}
+
+.project-create-header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.project-create-header .helper-text {
+  margin-top: 0;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+.checkbox-row input {
+  width: auto;
+  margin: 0;
+}
+
 .terminal-section {
   padding: 1rem;
 }
@@ -1235,6 +1267,10 @@ textarea {
 .success-banner {
   padding: 0.85rem 1rem;
   color: var(--success);
+}
+
+.compact-success {
+  margin-top: 0;
 }
 
 .error-banner {

@@ -7,6 +7,7 @@ import { savePastedDocument } from "./documents.js";
 import { getGitDiff } from "./git-diff.js";
 import { getGitStatus } from "./git-status.js";
 import { createRecentProjectsStore } from "./recent-projects.js";
+import { createProject } from "./projects.js";
 import { SessionManager } from "./session.js";
 
 export type AppServices = {
@@ -122,6 +123,20 @@ export function createApp(services: AppServices) {
       response.json(document);
     } catch (error) {
       sendBadRequest(response, "Could not save pasted document.", error);
+    }
+  });
+
+  app.post("/api/projects", (request, response) => {
+    try {
+      const project = createProject({
+        repoPath: readString(request.body?.repoPath),
+        createFolder: Boolean(request.body?.createFolder),
+        initializeGit: Boolean(request.body?.initializeGit),
+        createReadme: Boolean(request.body?.createReadme)
+      });
+      response.json(project);
+    } catch (error) {
+      sendBadRequest(response, "Could not create the project folder.", error);
     }
   });
 

@@ -11,6 +11,20 @@ export type SessionStatus = {
   repoPath: string | null;
 };
 
+export type CreateProjectOptions = {
+  createFolder: boolean;
+  initializeGit: boolean;
+  createReadme: boolean;
+};
+
+export type CreateProjectResponse = {
+  repoPath: string;
+  createdFolder: boolean;
+  initializedGit: boolean;
+  createdReadme: boolean;
+  message: string;
+};
+
 export type SessionHistoryItem = {
   id: string;
   repoPath: string;
@@ -69,6 +83,11 @@ export type ProjectControlsProps = {
   onRepoPathChange(nextPath: string): void;
   onChooseRepo(): void;
   repoPickerMessage: string;
+  projectMessage: string;
+  createProjectOptions: CreateProjectOptions;
+  onCreateProjectOptionChange(nextOptions: CreateProjectOptions): void;
+  onCreateProject(): void;
+  isCreatingProject: boolean;
   onStartSession(): void;
   onStopSession(): void;
   connectionStateLabel: string;

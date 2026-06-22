@@ -11,6 +11,8 @@ import {
 } from "./app-feedback";
 import type {
   AppSettings,
+  CreateProjectOptions,
+  CreateProjectResponse,
   DiffViewerState,
   GitStatusSummary,
   RecentProjectItem,
@@ -66,6 +68,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: "dark"
 };
 
+const DEFAULT_CREATE_PROJECT_OPTIONS: CreateProjectOptions = {
+  createFolder: true,
+  initializeGit: true,
+  createReadme: true
+};
+
 function formatDuration(durationMs: number | null): string {
   if (durationMs === null) {
     return "In progress";
@@ -117,6 +125,9 @@ export function App() {
   const [settingsMessage, setSettingsMessage] = useState("");
   const [contextMessage, setContextMessage] = useState("");
   const [repoPickerMessage, setRepoPickerMessage] = useState("");
+  const [projectMessage, setProjectMessage] = useState("");
+  const [createProjectOptions, setCreateProjectOptions] = useState<CreateProjectOptions>(DEFAULT_CREATE_PROJECT_OPTIONS);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(true);
@@ -144,6 +155,12 @@ export function App() {
   const generatedPromptPreview = buildPromptPreviewOutput(promptText, pendingContextItems);
   const diffPanelText = diffViewer.diff ? buildGitDiffPanelText(diffViewer.diff) : "";
   const diffEmptyState = diffViewer.diff ? buildGitDiffEmptyState(diffViewer.diff) : "";
+
+  const updateRepoPath = (nextPath: string) => {
+    setRepoPath(nextPath);
+    setProjectMessage("");
+    setRepoPickerMessage("");
+  };
 
   const setCopyFeedback = (subject: string, result: Awaited<ReturnType<typeof copyRelativePath>>) => {
     setContextMessage(buildCopySuccessMessage(subject, result));
@@ -713,12 +730,13 @@ export function App() {
   const handleChooseRepo = async () => {
     setError("");
     setRepoPickerMessage("");
+    setProjectMessage("");
 
     try {
       const result = await chooseRepoDirectory();
 
       if (result.kind === "selected") {
-        setRepoPath(result.repoPath);
+        updateRepoPath(result.repoPath);
         setRepoPickerMessage(`Selected ${result.repoPath}.`);
         return;
       }
@@ -733,6 +751,43 @@ export function App() {
       }
     } catch {
       setError("Could not open the folder picker. Paste the full project folder path manually.");
+    }
+  };
+
+  const createProjectFolder = async () => {
+    setError("");
+    setRepoPickerMessage("");
+    setProjectMessage("");
+    setIsCreatingProject(true);
+
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          repoPath,
+          ...createProjectOptions
+        })
+      });
+
+      const payload = (await response.json()) as CreateProjectResponse | { error?: string };
+      if (!response.ok || !("repoPath" in payload)) {
+        throw new Error(
+          payload && "error" in payload && typeof payload.error === "string"
+            ? payload.error
+            : "Could not create the project folder."
+        );
+      }
+
+      const project = payload as CreateProjectResponse;
+      updateRepoPath(project.repoPath);
+      setProjectMessage(`${project.message} You can start a Codex session in it now.`);
+    } catch (requestError) {
+      setError(toErrorMessage(requestError, "Could not create the project folder."));
+    } finally {
+      setIsCreatingProject(false);
     }
   };
 
@@ -885,9 +940,16 @@ export function App() {
           projectControls={{
             status,
             repoPath,
-            onRepoPathChange: setRepoPath,
+            onRepoPathChange: updateRepoPath,
             onChooseRepo: handleChooseRepo,
             repoPickerMessage,
+            projectMessage,
+            createProjectOptions,
+            onCreateProjectOptionChange: setCreateProjectOptions,
+            onCreateProject: () => {
+              void createProjectFolder();
+            },
+            isCreatingProject,
             onStartSession: startSession,
             onStopSession: stopSession,
             connectionStateLabel: formatConnectionState(connectionState),
