@@ -19,6 +19,8 @@ export type SessionFailurePayload = {
 export type SessionExitPayload = {
   exitCode: number;
   signal: number;
+  startedAt?: string | null;
+  endedAt?: string | null;
   failure?: SessionFailurePayload | null;
 };
 

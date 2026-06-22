@@ -97,12 +97,12 @@ describe("SessionManager", () => {
     managersToCleanup.push(manager);
 
     const session = manager.start("owner-1", repoPath);
-    expect(manager.getStatus("owner-1")).toEqual({ active: true, repoPath });
+    expect(manager.getStatus("owner-1")).toEqual({ active: true, repoPath, startedAt: session.startedAt });
 
     manager.appendOutput("owner-1", "hello from codex");
     manager.clear("owner-1");
 
-    expect(manager.getStatus("owner-1")).toEqual({ active: false, repoPath: null });
+    expect(manager.getStatus("owner-1")).toEqual({ active: false, repoPath: null, startedAt: null });
     expect(fs.existsSync(session.transcriptPath)).toBe(true);
     expect(fs.existsSync(session.rawTranscriptPath)).toBe(true);
     expect(fs.readFileSync(session.transcriptPath, "utf8")).toBe("hello from codex");
@@ -197,8 +197,8 @@ describe("SessionManager", () => {
 
     expect(firstPty.kill).toHaveBeenCalledTimes(1);
     expect(secondPty.kill).toHaveBeenCalledTimes(1);
-    expect(manager.getStatus("owner-a")).toEqual({ active: false, repoPath: null });
-    expect(manager.getStatus("owner-b")).toEqual({ active: false, repoPath: null });
+    expect(manager.getStatus("owner-a")).toEqual({ active: false, repoPath: null, startedAt: null });
+    expect(manager.getStatus("owner-b")).toEqual({ active: false, repoPath: null, startedAt: null });
   });
 
   it("finalizes transcripts during stopAll and ignores late output", () => {

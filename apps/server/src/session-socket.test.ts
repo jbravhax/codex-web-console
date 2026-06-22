@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { attachSessionSocket } from "./session-socket.js";
 
 type MessageHandler = (rawMessage: { toString(): string }) => void;
-type CloseHandler = () => void;
+type CloseHandler = (code?: number, reason?: Buffer) => void;
 
 class FakeSocket {
   public readyState = 1;
@@ -31,8 +31,8 @@ class FakeSocket {
     });
   }
 
-  emitClose(): void {
-    this.closeHandler?.();
+  emitClose(code?: number, reason?: string): void {
+    this.closeHandler?.(code, reason ? Buffer.from(reason) : undefined);
   }
 }
 
@@ -61,12 +61,13 @@ describe("attachSessionSocket", () => {
   it("sends initial status and starts a session from websocket messages", () => {
     const socket = new FakeSocket();
     const fakePty = new FakePtyProcess();
+    const startedAt = "2026-06-22T21:00:00.000Z";
     const sessionManager = {
       getStatus: vi
         .fn()
-        .mockReturnValueOnce({ active: false, repoPath: null })
-        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project" }),
-      start: vi.fn().mockReturnValue({ ptyProcess: fakePty }),
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
+        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt }),
+      start: vi.fn().mockReturnValue({ ptyProcess: fakePty, startedAt, repoPath: "/workspace/project" }),
       getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),
       clear: vi.fn(),
@@ -78,21 +79,22 @@ describe("attachSessionSocket", () => {
     attachSessionSocket(socket, "owner-1", sessionManager as never);
     socket.emitMessage({ type: "start", repoPath: "/workspace/project" });
 
-    expect(socket.sent[0]).toEqual({ type: "status", payload: { active: false, repoPath: null } });
+    expect(socket.sent[0]).toEqual({ type: "status", payload: { active: false, repoPath: null, startedAt: null } });
     expect(sessionManager.start).toHaveBeenCalledWith("owner-1", "/workspace/project");
-    expect(socket.sent[1]).toEqual({ type: "status", payload: { active: true, repoPath: "/workspace/project" } });
+    expect(socket.sent[1]).toEqual({ type: "status", payload: { active: true, repoPath: "/workspace/project", startedAt } });
   });
 
   it("streams PTY output and sends exit plus inactive status", () => {
     const socket = new FakeSocket();
     const fakePty = new FakePtyProcess();
+    const startedAt = "2026-06-22T21:01:00.000Z";
     const sessionManager = {
       getStatus: vi
         .fn()
-        .mockReturnValueOnce({ active: false, repoPath: null })
-        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project" })
-        .mockReturnValueOnce({ active: false, repoPath: null }),
-      start: vi.fn().mockReturnValue({ ptyProcess: fakePty }),
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
+        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt })
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null }),
+      start: vi.fn().mockReturnValue({ ptyProcess: fakePty, startedAt, repoPath: "/workspace/project" }),
       getRecentOutput: vi.fn().mockReturnValue("codex output"),
       appendOutput: vi.fn(),
       clear: vi.fn(),
@@ -109,14 +111,17 @@ describe("attachSessionSocket", () => {
     expect(sessionManager.appendOutput).toHaveBeenCalledWith("owner-2", "codex output");
     expect(socket.sent).toContainEqual({ type: "output", payload: "codex output" });
     expect(sessionManager.clear).toHaveBeenCalledWith("owner-2");
-    expect(socket.sent).toContainEqual({ type: "exit", payload: { exitCode: 0, signal: 15, failure: null } });
-    expect(socket.sent).toContainEqual({ type: "status", payload: { active: false, repoPath: null } });
+    expect(socket.sent).toContainEqual({
+      type: "exit",
+      payload: expect.objectContaining({ exitCode: 0, signal: 15, startedAt, endedAt: expect.any(String), failure: null })
+    });
+    expect(socket.sent).toContainEqual({ type: "status", payload: { active: false, repoPath: null, startedAt: null } });
   });
 
   it("delegates input, resize, stop, and close cleanup", () => {
     const socket = new FakeSocket();
     const sessionManager = {
-      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null }),
+      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null, startedAt: null }),
       start: vi.fn(),
       getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),
@@ -140,7 +145,7 @@ describe("attachSessionSocket", () => {
   it("rejects invalid and malformed websocket messages", () => {
     const socket = new FakeSocket();
     const sessionManager = {
-      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null }),
+      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null, startedAt: null }),
       start: vi.fn(),
       getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),
@@ -161,7 +166,7 @@ describe("attachSessionSocket", () => {
   it("sends structured startup failures for known start errors", () => {
     const socket = new FakeSocket();
     const sessionManager = {
-      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null }),
+      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null, startedAt: null }),
       start: vi.fn().mockImplementation(() => {
         const error = new Error("spawn codex ENOENT") as Error & { code: string };
         error.code = "ENOENT";
@@ -184,5 +189,33 @@ describe("attachSessionSocket", () => {
         category: "codex-not-found"
       })
     });
+  });
+
+  it("cleans up on websocket close after a started session", () => {
+    const socket = new FakeSocket();
+    const fakePty = new FakePtyProcess();
+    const sessionManager = {
+      getStatus: vi
+        .fn()
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
+        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt: "2026-06-22T21:05:00.000Z" }),
+      start: vi.fn().mockReturnValue({
+        ptyProcess: fakePty,
+        startedAt: "2026-06-22T21:05:00.000Z",
+        repoPath: "/workspace/project"
+      }),
+      getRecentOutput: vi.fn().mockReturnValue(""),
+      appendOutput: vi.fn(),
+      clear: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      stop: vi.fn()
+    };
+
+    attachSessionSocket(socket, "owner-6", sessionManager as never);
+    socket.emitMessage({ type: "start", repoPath: "/workspace/project" });
+    socket.emitClose(1001, "browser closed");
+
+    expect(sessionManager.stop).toHaveBeenCalledWith("owner-6");
   });
 });

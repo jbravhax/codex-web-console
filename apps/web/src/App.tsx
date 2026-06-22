@@ -117,12 +117,12 @@ export function App() {
   const socketRef = useRef<WebSocket | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const statusRef = useRef<SessionStatus>({ active: false, repoPath: null });
+  const statusRef = useRef<SessionStatus>({ active: false, repoPath: null, startedAt: null });
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [activeView, setActiveView] = useState<"console" | "settings">("console");
   const [repoPath, setRepoPath] = useState("");
   const [promptText, setPromptText] = useState("");
-  const [status, setStatus] = useState<SessionStatus>({ active: false, repoPath: null });
+  const [status, setStatus] = useState<SessionStatus>({ active: false, repoPath: null, startedAt: null });
   const [sessions, setSessions] = useState<SessionHistoryItem[]>([]);
   const [recentProjects, setRecentProjects] = useState<RecentProjectItem[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -395,7 +395,7 @@ export function App() {
       }
 
       if (message.type === "exit") {
-        setStatus((current) => ({ active: false, repoPath: current.repoPath }));
+        setStatus((current) => ({ active: false, repoPath: current.repoPath, startedAt: null }));
         const exitDisplay = buildUnexpectedExitDisplay(message.payload);
         if (exitDisplay) {
           setError(`${exitDisplay.detail}\nTechnical details: ${exitDisplay.technicalDetail}`);
@@ -411,7 +411,9 @@ export function App() {
         setPendingContextItems([]);
         terminalRef.current?.writeln("");
         terminalRef.current?.writeln(
-          `[session ended: exit ${message.payload.exitCode}, signal ${message.payload.signal}]`
+          `[session ended: exit ${message.payload.exitCode}, signal ${message.payload.signal}${
+            message.payload.startedAt ? `, started ${message.payload.startedAt}` : ""
+          }${message.payload.endedAt ? `, ended ${message.payload.endedAt}` : ""}]`
         );
         return;
       }
@@ -438,13 +440,19 @@ export function App() {
       }
     };
 
-    socket.onclose = () => {
+    socket.onclose = (closeEvent) => {
       setConnectionState("disconnected");
-      setStatus((current) => ({ active: false, repoPath: current.repoPath }));
+      setStatus((current) => ({ active: false, repoPath: current.repoPath, startedAt: null }));
+      const closeCode = typeof closeEvent?.code === "number" ? closeEvent.code : 1006;
+      const closeReason = typeof closeEvent?.reason === "string" && closeEvent.reason.trim().length > 0
+        ? closeEvent.reason.trim()
+        : "No close reason was provided.";
       const detail =
-        "The live session disconnected from the local Codex server. If the server stopped, restart it. Then open a new session and try again.";
+        closeCode === 1000
+          ? "The live session disconnected cleanly from the local Codex server."
+          : "The live session disconnected from the local Codex server. If the server stopped, restart it. Then open a new session and try again.";
       setSessionBanner((current) => reduceSessionBanner(current, { type: "websocket-close", detail }));
-      setError(`${detail}\nTechnical details: websocket connection closed.`);
+      setError(`${detail}\nTechnical details: websocket connection closed with code ${closeCode}. Reason: ${closeReason}`);
     };
 
     socketRef.current = socket;

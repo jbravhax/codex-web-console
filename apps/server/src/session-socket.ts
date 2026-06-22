@@ -7,7 +7,7 @@ type SessionSocket = {
   readyState: number;
   send(data: string): void;
   on(event: "message", listener: (rawMessage: { toString(): string }) => void): void;
-  on(event: "close", listener: () => void): void;
+  on(event: "close", listener: (code?: number, reason?: Buffer) => void): void;
 };
 
 function sendMessage(socket: SessionSocket, type: string, payload: unknown): void {
@@ -54,9 +54,16 @@ export function attachSessionSocket(socket: SessionSocket, ownerId: string, sess
           const resolvedExitCode = exitCode ?? 0;
           const resolvedSignal = signal ?? 0;
           const failure = classifySessionExit(resolvedExitCode, resolvedSignal, recentOutput, session.repoPath);
+          const endedAt = new Date().toISOString();
           sessionManager.clear(ownerId);
           if (socket.readyState === (1 as SocketReadyState)) {
-            sendMessage(socket, "exit", { exitCode: resolvedExitCode, signal: resolvedSignal, failure });
+            sendMessage(socket, "exit", {
+              exitCode: resolvedExitCode,
+              signal: resolvedSignal,
+              startedAt: session.startedAt,
+              endedAt,
+              failure
+            });
             sendMessage(socket, "status", sessionManager.getStatus(ownerId));
           }
         });

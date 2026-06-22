@@ -9,6 +9,7 @@ import { stripTerminalSequences } from "./transcript-cleaner.js";
 export type SessionStatus = {
   active: boolean;
   repoPath: string | null;
+  startedAt: string | null;
 };
 
 export type SessionListItem = {
@@ -94,7 +95,8 @@ export class SessionManager {
     const session = this.sessions.get(ownerId);
     return {
       active: session !== undefined,
-      repoPath: session?.repoPath ?? null
+      repoPath: session?.repoPath ?? null,
+      startedAt: session?.startedAt ?? null
     };
   }
 

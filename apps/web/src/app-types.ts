@@ -9,6 +9,7 @@ export type ThemeSetting = "light" | "dark";
 export type SessionStatus = {
   active: boolean;
   repoPath: string | null;
+  startedAt: string | null;
 };
 
 export type CreateProjectOptions = {

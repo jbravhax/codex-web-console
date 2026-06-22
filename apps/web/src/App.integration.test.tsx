@@ -74,7 +74,7 @@ class FakeWebSocket {
   sent: string[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event: { code?: number; reason?: string }) => void) | null = null;
 
   constructor(public readonly url: string) {
     FakeWebSocket.instances.push(this);
@@ -85,7 +85,7 @@ class FakeWebSocket {
   }
 
   close() {
-    this.onclose?.();
+    this.onclose?.({});
   }
 
   emitOpen() {
@@ -98,8 +98,8 @@ class FakeWebSocket {
     });
   }
 
-  emitClose() {
-    this.onclose?.();
+  emitClose(event?: { code?: number; reason?: string }) {
+    this.onclose?.(event ?? {});
   }
 }
 
@@ -209,7 +209,8 @@ function emitSessionStatus(socket: FakeWebSocket, active: boolean, repoPath: str
     type: "status",
     payload: {
       active,
-      repoPath
+      repoPath,
+      startedAt: active ? "2026-06-22T21:10:00.000Z" : null
     }
   });
 }
@@ -365,8 +366,9 @@ describe("App integration", () => {
     expect(await screen.findByText("Request completed")).toBeTruthy();
     expect(screen.getAllByText(/send another prompt when you're ready/i).length).toBeGreaterThan(0);
 
-    socket.emitClose();
+    socket.emitClose({ code: 1006, reason: "server stopped" });
     expect(await screen.findByText("Disconnected")).toBeTruthy();
+    expect(await screen.findByText(/Technical details: websocket connection closed with code 1006. Reason: server stopped/i)).toBeTruthy();
   });
 
   it("shows specific repo validation errors instead of generic attachment guidance", async () => {
@@ -449,6 +451,8 @@ describe("App integration", () => {
       payload: {
         exitCode: 1,
         signal: 0,
+        startedAt: "2026-06-22T21:12:00.000Z",
+        endedAt: "2026-06-22T21:13:30.000Z",
         failure: {
           category: "sandbox-unavailable",
           userMessage:
@@ -460,6 +464,24 @@ describe("App integration", () => {
 
     expect(await screen.findByText("Session failed")).toBeTruthy();
     expect((await screen.findAllByText(/could not finish starting its linux sandbox/i)).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("writes exit diagnostics into the terminal summary for completed sessions", async () => {
+    const socket = renderApp();
+    emitSessionStatus(socket, true, "/workspace/default-project");
+
+    socket.emitMessage({
+      type: "exit",
+      payload: {
+        exitCode: 0,
+        signal: 15,
+        startedAt: "2026-06-22T21:15:00.000Z",
+        endedAt: "2026-06-22T21:16:00.000Z",
+        failure: null
+      }
+    });
+
+    expect(await screen.findByText("Session completed")).toBeTruthy();
   });
 
   it("shows an empty preview state when nothing is queued", async () => {
