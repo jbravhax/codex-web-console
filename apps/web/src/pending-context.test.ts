@@ -184,7 +184,7 @@ describe("pending context model", () => {
       },
       {
         label: "ZIP extraction summary",
-        lines: ["bundle.zip: 3 extracted, Some ZIP entries were skipped. 1 unsupported-type"]
+        lines: ["bundle.zip: 3 extracted, Some ZIP entries were skipped for safety or compatibility. 1 unsupported file types"]
       }
     ]);
   });

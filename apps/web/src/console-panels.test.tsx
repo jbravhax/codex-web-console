@@ -86,8 +86,8 @@ describe("PendingContextPanel", () => {
     expect(screen.getByText("Pasted images")).toBeTruthy();
     expect(screen.getByText("ZIP uploads")).toBeTruthy();
     expect(screen.getByText("Extracted folder: .codex-web/attachments/extracted/bundle/")).toBeTruthy();
-    expect(screen.getByText("Skipped reasons: 2 unsupported-type")).toBeTruthy();
-    expect(screen.getByText("Warning: Some ZIP entries were skipped. 2 unsupported-type")).toBeTruthy();
+    expect(screen.getByText("Warning: Some ZIP entries were skipped for safety or compatibility. 2 unsupported file types")).toBeTruthy();
+    expect(screen.getByText("Skipped reasons: 2 unsupported file types")).toBeTruthy();
   });
 
   it("fires clear-all from the grouped context panel", () => {

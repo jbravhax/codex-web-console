@@ -2,12 +2,28 @@ import type { SavedPromptDocument } from "./prompt-documents";
 import type { PendingAttachment } from "./attachment-types";
 import { buildSavedDocumentPromptLine, buildZipPromptBlock, buildReviewFilesPromptBlock } from "./prompt-context";
 import type { PendingContextItem, PendingContextKind } from "./pending-context-types";
+import { copyTextWithFallback } from "./clipboard";
 
 export type { PendingContextItem, PendingContextKind } from "./pending-context-types";
 export type PromptPreviewSection = {
   label: string;
   lines: string[];
 };
+
+function formatZipSkipReason(reason: string): string {
+  switch (reason) {
+    case "unsupported-type":
+      return "unsupported file types";
+    default:
+      return reason.replace(/-/g, " ");
+  }
+}
+
+function formatZipSkipSummary(skipReasonCounts: Record<string, number>): string {
+  return Object.entries(skipReasonCounts)
+    .map(([reason, count]) => `${count} ${formatZipSkipReason(reason)}`)
+    .join(", ");
+}
 
 function inferAttachmentKind(attachment: PendingAttachment): PendingContextKind {
   if (attachment.kind === "zip") {
@@ -23,9 +39,7 @@ function inferAttachmentKind(attachment: PendingAttachment): PendingContextKind 
 
 function describeAttachment(attachment: PendingAttachment): Omit<PendingContextItem, "uploadState" | "progressPercent"> {
   if (attachment.kind === "zip") {
-    const skipSummary = Object.entries(attachment.skippedReasonCounts)
-      .map(([reason, count]) => `${count} ${reason}`)
-      .join(", ");
+    const skipSummary = formatZipSkipSummary(attachment.skippedReasonCounts);
 
     return {
       id: attachment.attachmentId,
@@ -43,7 +57,7 @@ function describeAttachment(attachment: PendingAttachment): Omit<PendingContextI
       detailLine: `${attachment.extractedFileCount} extracted, ${attachment.skippedFileCount} skipped, ${attachment.totalExtractedBytes.toLocaleString()} bytes`,
       warningText:
         attachment.skippedFileCount > 0
-          ? `Some ZIP entries were skipped. ${skipSummary || "See extraction summary for details."}`
+          ? `Some ZIP entries were skipped for safety or compatibility. ${skipSummary || "See extraction summary for details."}`
           : undefined,
       promptLines: [
         buildZipPromptBlock(
@@ -262,11 +276,11 @@ export function buildPromptPreviewOutput(prompt: string, items: PendingContextIt
 }
 
 export function copyRelativePath(relativePath: string): Promise<void> {
-  return navigator.clipboard.writeText(relativePath);
+  return copyTextWithFallback(relativePath);
 }
 
 export function copyGeneratedPromptContext(text: string): Promise<void> {
-  return navigator.clipboard.writeText(text);
+  return copyTextWithFallback(text);
 }
 
 export function createPendingContextItemFromAttachment(attachment: PendingAttachment): PendingContextItem {

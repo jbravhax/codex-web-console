@@ -9,6 +9,7 @@ import type {
   SessionHistoryPanelProps
 } from "./app-types";
 import type { PendingContextItem } from "./pending-context-types";
+import type { SessionBanner } from "./session-banner";
 
 type PendingContextGroup = {
   key: PendingContextItem["kind"];
@@ -30,6 +31,27 @@ function groupPendingContextItems(items: PendingContextItem[]): PendingContextGr
       items: items.filter((item) => item.kind === group.key)
     }))
     .filter((group) => group.items.length > 0);
+}
+
+function formatZipSkipReason(reason: string): string {
+  switch (reason) {
+    case "unsupported-type":
+      return "unsupported file types";
+    default:
+      return reason.replace(/-/g, " ");
+  }
+}
+
+function buildTerminalGuidance(sessionBanner: SessionBanner): string | null {
+  if (sessionBanner.title === "Approval needed") {
+    return "Approval is waiting inside the terminal. Review the request there, then press Enter to approve or Esc to cancel.";
+  }
+
+  if (sessionBanner.state === "waiting") {
+    return "Codex is still working through the current request. Watch the terminal for progress or approval prompts.";
+  }
+
+  return null;
 }
 
 export function ConsoleHeader({ activeView, onChangeView, sessionBanner }: ConsoleHeaderProps) {
@@ -109,7 +131,7 @@ export function ProjectControls({
         </button>
       </div>
       <p className="helper-text">
-        Enter a specific project folder here, not a parent directory that contains many projects.
+        Enter one real project folder here, not a parent directory that contains many different projects.
       </p>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
       <div className="control-actions">
@@ -244,7 +266,7 @@ export function PendingContextPanel({
                             <span className="attachment-detail">
                               Skipped reasons:{" "}
                               {Object.entries(item.skippedReasonCounts)
-                                .map(([reason, count]) => `${count} ${reason}`)
+                                .map(([reason, count]) => `${count} ${formatZipSkipReason(reason)}`)
                                 .join(", ")}
                             </span>
                           ) : null}
@@ -308,6 +330,7 @@ export function PendingContextPanel({
 
 export function ComposerPanel({
   status,
+  sessionBanner,
   promptText,
   onPromptTextChange,
   onPromptPaste,
@@ -324,6 +347,8 @@ export function ComposerPanel({
   onSendPrompt,
   contextMessage
 }: ComposerPanelProps) {
+  const terminalGuidance = buildTerminalGuidance(sessionBanner);
+
   return (
     <section
       className="prompt-panel workspace-card composer-card"
@@ -339,6 +364,7 @@ export function ComposerPanel({
           <p className="helper-text">
             Write the task, attach supporting context, and review the final assembled prompt before sending it.
           </p>
+          {terminalGuidance ? <p className="helper-text composer-guidance">{terminalGuidance}</p> : null}
         </div>
         <div className="attachment-actions">
           <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={!status.active}>
@@ -591,8 +617,11 @@ export function ConsoleView({
   repoInsightsPanel,
   sessionHistoryPanel,
   status,
+  sessionBanner,
   terminalContainerRef
 }: ConsoleViewProps) {
+  const terminalGuidance = buildTerminalGuidance(sessionBanner);
+
   return (
     <div className="console-layout">
       <aside className="control-rail">
@@ -613,6 +642,7 @@ export function ConsoleView({
               <span className="section-chip">{status.active ? "Interactive" : "Waiting"}</span>
             </div>
           </div>
+          {terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
           <div ref={terminalContainerRef} className="terminal-panel" />
         </section>
       </main>

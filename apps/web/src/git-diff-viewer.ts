@@ -1,3 +1,5 @@
+import { copyTextWithFallback } from "./clipboard";
+
 export type GitDiffSummary = {
   repoPath: string;
   isGitRepo: boolean;
@@ -46,6 +48,10 @@ export function buildGitDiffEmptyState(diff: GitDiffSummary): string {
   return "";
 }
 
-export function copyGitDiffText(text: string): Promise<void> {
-  return navigator.clipboard.writeText(text);
+export function copyGitDiffText(
+  text: string,
+  clipboard: Pick<Clipboard, "writeText"> | undefined = navigator.clipboard,
+  doc: Document = document
+): Promise<void> {
+  return copyTextWithFallback(text, clipboard, doc);
 }

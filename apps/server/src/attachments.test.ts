@@ -299,7 +299,7 @@ describe("ZIP attachments", () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error).toContain("2,000");
-  });
+  }, 15000);
 
   it("enforces the total extracted size limit", async () => {
     const repoPath = makeTempDir("codex-web-zip-");

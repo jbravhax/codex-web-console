@@ -303,7 +303,8 @@ describe("App integration", () => {
       type: "output",
       payload: "Would you like to run the following command?\nPress enter to confirm"
     });
-    expect(await screen.findByText("Waiting for approval")).toBeTruthy();
+    expect(await screen.findByText("Approval needed")).toBeTruthy();
+    expect(screen.getAllByText(/Press Enter to approve or Esc to cancel/i).length).toBeGreaterThan(0);
 
     socket.emitMessage({
       type: "output",
@@ -320,7 +321,7 @@ describe("App integration", () => {
       payload: "The path does not exist: /workspace/missing-project"
     });
 
-    const repoPathMessages = await screen.findAllByText(/That path does not exist yet/i);
+    const repoPathMessages = await screen.findAllByText(/That project folder does not exist yet/i);
     expect(repoPathMessages.length).toBeGreaterThanOrEqual(1);
   });
 

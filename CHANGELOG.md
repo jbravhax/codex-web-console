@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.2.1] - 2026-06-22
+
+### Changed
+
+- Clarified approval and waiting guidance so the app explains when to keep focus on the terminal and how to approve or cancel follow-up requests.
+- Improved repo and project-folder messaging so users are guided toward one real project folder instead of broad parent directories.
+- Added a shared clipboard utility with fallback copy behavior so transcript, diff, preview, and path-copy actions behave more consistently across browsers.
+- Converted ZIP skipped-file summaries into human-readable reasons to make extraction outcomes easier to trust at a glance.
+- Tightened trust and workflow clarity across prompt sending, repo picking, pending context review, and session guidance surfaces.
+
+### Tests
+
+- Expanded automated coverage to 71 web tests and 59 server tests for the stabilization pass.
+
 ## [0.2.0] - 2026-06-21
 
 ### Added

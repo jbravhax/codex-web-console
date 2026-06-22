@@ -22,13 +22,13 @@ describe("friendlyUploadErrorMessage", () => {
 
   it("preserves actionable repo path validation guidance", () => {
     expect(friendlyUploadErrorMessage("The path does not exist: /workspace/missing")).toContain(
-      "Create the folder first"
+      "Create it first"
     );
     expect(
       friendlyUploadErrorMessage(
         "That folder does not look like a project yet. Expected one of: .git, package.json, pyproject.toml, Cargo.toml, or README.md."
       )
-    ).toContain("does not look like a project yet");
+    ).toContain("not a parent folder");
   });
 
   it("maps oversize pasted context errors to clearer guidance", () => {

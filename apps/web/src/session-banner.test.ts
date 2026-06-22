@@ -40,12 +40,12 @@ describe("session banner state", () => {
     expect(waitingForCodex).toEqual({
       state: "waiting",
       title: "Waiting for Codex",
-      detail: "Prompt sent. Codex should start responding without any extra terminal input."
+      detail: "Prompt sent. Watch the terminal below. If Codex asks for approval, press Enter to approve or Esc to cancel."
     });
     expect(waitingForApproval).toEqual({
       state: "waiting",
-      title: "Waiting for approval",
-      detail: "Codex is asking for confirmation in the terminal. Press Enter to approve or Esc to cancel."
+      title: "Approval needed",
+      detail: "Codex is waiting in the terminal below for your confirmation. Review the request, then press Enter to approve or Esc to cancel."
     });
   });
 
@@ -58,7 +58,7 @@ describe("session banner state", () => {
     expect(running).toEqual({
       state: "running",
       title: "Codex is responding",
-      detail: "Codex is processing output in /workspace/project."
+      detail: "Codex is processing output in /workspace/project. Stay in the terminal area if you expect follow-up prompts or approvals."
     });
   });
 

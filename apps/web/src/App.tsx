@@ -138,6 +138,15 @@ export function App() {
   const diffPanelText = diffViewer.diff ? buildGitDiffPanelText(diffViewer.diff) : "";
   const diffEmptyState = diffViewer.diff ? buildGitDiffEmptyState(diffViewer.diff) : "";
 
+  const setCopyFeedback = (subject: string) => {
+    setContextMessage(`Copied ${subject}.`);
+    setError("");
+  };
+
+  const setClipboardFailure = (subject: string) => {
+    setError(`Could not copy ${subject}. Your browser may have blocked clipboard access.`);
+  };
+
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
@@ -719,10 +728,9 @@ export function App() {
   const copyItemRelativePath = async (relativePath: string) => {
     try {
       await copyRelativePath(relativePath);
-      setContextMessage(`Copied ${relativePath}.`);
-      setError("");
+      setCopyFeedback(relativePath);
     } catch {
-      setError("Could not copy the relative path. Your browser may have blocked clipboard access.");
+      setClipboardFailure("that relative path");
     }
   };
 
@@ -756,10 +764,9 @@ export function App() {
   const copyPromptPreview = async () => {
     try {
       await copyGeneratedPromptContext(generatedPromptPreview);
-      setContextMessage("Copied exactly what Codex will receive.");
-      setError("");
+      setCopyFeedback("exactly what Codex will receive");
     } catch {
-      setError("Could not copy the generated prompt context. Your browser may have blocked clipboard access.");
+      setClipboardFailure("the prompt preview");
     }
   };
 
@@ -796,10 +803,9 @@ export function App() {
 
     try {
       await copyTranscriptText(transcriptViewer.transcript);
-      setContextMessage("Copied transcript.");
-      setError("");
+      setCopyFeedback("the transcript");
     } catch {
-      setError("Could not copy the transcript. Your browser may have blocked clipboard access.");
+      setClipboardFailure("the transcript");
     }
   };
 
@@ -837,10 +843,9 @@ export function App() {
 
     try {
       await copyGitDiffText(diffPanelText);
-      setContextMessage("Copied diff.");
-      setError("");
+      setCopyFeedback("the diff");
     } catch {
-      setError("Could not copy the diff. Your browser may have blocked clipboard access.");
+      setClipboardFailure("the diff");
     }
   };
 
@@ -884,6 +889,7 @@ export function App() {
           }}
           composerPanel={{
             status,
+            sessionBanner,
             promptText,
             onPromptTextChange: setPromptText,
             onPromptPaste: handlePromptPaste,
@@ -929,6 +935,7 @@ export function App() {
             formatDuration
           }}
           status={status}
+          sessionBanner={sessionBanner}
           terminalContainerRef={terminalContainerRef}
         />
       ) : (

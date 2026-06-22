@@ -48,7 +48,7 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
     return {
       state: "connecting",
       title: "Starting session",
-      detail: `Starting Codex in ${formatRepoTarget(event.repoPath)}...`
+      detail: `Starting Codex in ${formatRepoTarget(event.repoPath)}. This needs to be a real project folder, not a broad parent directory.`
     };
   }
 
@@ -56,7 +56,7 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
     return {
       state: "waiting",
       title: "Waiting for Codex",
-      detail: "Prompt sent. Codex should start responding without any extra terminal input."
+      detail: "Prompt sent. Watch the terminal below. If Codex asks for approval, press Enter to approve or Esc to cancel."
     };
   }
 
@@ -83,8 +83,8 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
   if (event.type === "waiting-for-approval") {
     return {
       state: "waiting",
-      title: "Waiting for approval",
-      detail: "Codex is asking for confirmation in the terminal. Press Enter to approve or Esc to cancel."
+      title: "Approval needed",
+      detail: "Codex is waiting in the terminal below for your confirmation. Review the request, then press Enter to approve or Esc to cancel."
     };
   }
 
@@ -92,7 +92,7 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
     return {
       state: "running",
       title: "Codex is responding",
-      detail: `Codex is processing output in ${formatRepoTarget(event.repoPath)}.`
+      detail: `Codex is processing output in ${formatRepoTarget(event.repoPath)}. Stay in the terminal area if you expect follow-up prompts or approvals.`
     };
   }
 

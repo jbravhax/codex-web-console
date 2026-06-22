@@ -89,6 +89,7 @@ export type PendingContextPanelProps = {
 
 export type ComposerPanelProps = {
   status: SessionStatus;
+  sessionBanner: SessionBanner;
   promptText: string;
   onPromptTextChange(nextPrompt: string): void;
   onPromptPaste(content: React.ClipboardEvent<HTMLTextAreaElement>): void | Promise<void>;
@@ -133,6 +134,7 @@ export type ConsoleViewProps = {
   repoInsightsPanel: RepoInsightsPanelProps;
   sessionHistoryPanel: SessionHistoryPanelProps;
   status: SessionStatus;
+  sessionBanner: SessionBanner;
   terminalContainerRef: React.RefObject<HTMLDivElement | null>;
 };
 

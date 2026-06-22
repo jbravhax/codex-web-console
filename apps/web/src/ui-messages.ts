@@ -39,19 +39,19 @@ export function friendlyUploadErrorMessage(message: string): string {
   }
 
   if (normalizedMessage.includes("does not exist")) {
-    return "That path does not exist yet. Create the folder first, then start Codex in that specific project folder.";
+    return "That project folder does not exist yet. Create it first, then start Codex in that specific project folder.";
   }
 
   if (normalizedMessage.includes("not a directory")) {
-    return "That path points to a file. Enter a specific project folder instead.";
+    return "That path points to a file, not a project folder. Enter a specific project folder instead.";
   }
 
   if (normalizedMessage.includes("does not look like a project")) {
-    return "That folder does not look like a project yet. Choose a specific project folder or add .git, README.md, package.json, pyproject.toml, or Cargo.toml first.";
+    return "That folder does not look like a project yet. Choose a specific project folder, not a parent folder like /home/you/Projects, or add .git, README.md, package.json, pyproject.toml, or Cargo.toml first.";
   }
 
   if (normalizedMessage.includes("specific folder inside /home")) {
-    return "Use a specific project folder inside /home, not /home itself.";
+    return "Use a specific project folder inside /home, not /home itself or a broad parent directory.";
   }
 
   if (normalizedMessage.includes("Refusing to start Codex")) {

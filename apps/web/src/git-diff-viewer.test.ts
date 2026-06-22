@@ -55,4 +55,29 @@ describe("git diff viewer helpers", () => {
     await copyGitDiffText("diff --git a/a.ts b/a.ts");
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith("diff --git a/a.ts b/a.ts");
   });
+
+  it("falls back to document copy when diff clipboard write fails", async () => {
+    const clipboard = {
+      writeText: vi.fn().mockRejectedValue(new Error("clipboard blocked"))
+    };
+    const textarea = {
+      value: "",
+      setAttribute: vi.fn(),
+      style: {} as CSSStyleDeclaration,
+      focus: vi.fn(),
+      select: vi.fn()
+    } as unknown as HTMLTextAreaElement;
+    const doc = {
+      body: {
+        appendChild: vi.fn(),
+        removeChild: vi.fn()
+      },
+      createElement: vi.fn().mockReturnValue(textarea),
+      execCommand: vi.fn().mockReturnValue(true)
+    } as unknown as Document;
+
+    await copyGitDiffText("diff --git a/a.ts b/a.ts", clipboard, doc);
+
+    expect(doc.execCommand).toHaveBeenCalledWith("copy");
+  });
 });

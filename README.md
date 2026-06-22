@@ -314,6 +314,7 @@ The UI also supports:
 - Copy relative path
 - Clear all pending context
 - Upload progress for larger files
+- Clipboard fallback behavior when browser clipboard APIs are blocked
 - Friendly empty state when nothing is pending
 
 Removing an item only removes it from the next prompt context. It does not delete the saved file from disk.
@@ -330,8 +331,9 @@ Notes:
 
 - The browser picker uses `window.showDirectoryPicker()` when available.
 - Some browsers let you pick a folder but do not expose a usable absolute filesystem path back to the page.
-- When that happens, the app does not guess or fake a path. It tells you to paste the repo path manually instead.
+- When that happens, the app does not guess or fake a path. It tells you to paste the project folder path manually instead.
 - Manual path entry remains available in every browser.
+- Codex still needs one real project folder, not a broad parent directory such as `/home/you/Projects`.
 
 ## Safety limits
 
@@ -346,6 +348,7 @@ Current local limits:
 - ZIP single extracted file maximum: `25MB`
 
 Unsupported files inside ZIP uploads are skipped and recorded in extraction metadata instead of failing the whole upload.
+The UI summarizes skipped files in human-readable language so you can tell what was excluded and why.
 
 ## API surface
 
@@ -391,7 +394,7 @@ Do not expose this app to untrusted users.
 - No database
 - No multi-project dashboard
 - No transcript search UI yet
-- No approval-specific custom UI beyond the terminal flow
+- Approval guidance is improved, but confirmation still happens in the Codex terminal flow
 - Git status is summary-only
 - Host and port changes require restarting the backend
 - The app assumes Linux usage even though parts of the codebase are cross-platform
