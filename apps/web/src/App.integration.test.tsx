@@ -293,7 +293,7 @@ describe("App integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Send prompt" }));
 
-    expect(await screen.findByText("Waiting for Codex")).toBeTruthy();
+    expect(await screen.findByText("Running request")).toBeTruthy();
     expect(socket.sent).toContain(
       JSON.stringify({
         type: "input",
@@ -306,13 +306,35 @@ describe("App integration", () => {
       payload: "Would you like to run the following command?\nPress enter to confirm"
     });
     expect(await screen.findByText("Approval needed")).toBeTruthy();
-    expect(screen.getAllByText(/Press Enter to approve or Esc to cancel/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/approve it there with Enter or cancel with Esc/i).length).toBeGreaterThan(0);
 
     socket.emitMessage({
       type: "output",
       payload: "Created only README.md."
     });
     expect(await screen.findByText("Codex is responding")).toBeTruthy();
+  });
+
+  it("shows explicit browser guidance when codex is waiting for input, completed, or disconnected", async () => {
+    const socket = renderApp();
+    emitSessionStatus(socket, true, "/workspace/default-project");
+
+    socket.emitMessage({
+      type: "output",
+      payload: "› Run /review on my current changes"
+    });
+    expect(await screen.findByText("Waiting for your next input")).toBeTruthy();
+    expect(screen.getAllByText(/waiting for your next instruction/i).length).toBeGreaterThan(0);
+
+    socket.emitMessage({
+      type: "output",
+      payload: "Created only README.md.\n\n─ Worked for 1m 23s ─"
+    });
+    expect(await screen.findByText("Request completed")).toBeTruthy();
+    expect(screen.getAllByText(/send another prompt when you're ready/i).length).toBeGreaterThan(0);
+
+    socket.emitClose();
+    expect(await screen.findByText("Disconnected")).toBeTruthy();
   });
 
   it("shows specific repo validation errors instead of generic attachment guidance", async () => {

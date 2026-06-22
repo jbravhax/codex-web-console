@@ -226,15 +226,21 @@ textarea {
 }
 
 .session-banner-connecting,
-.session-banner-waiting,
+.session-banner-starting,
+.session-banner-awaiting-approval,
+.session-banner-awaiting-input,
 .session-banner-stopping {
   border-color: #f59e0b;
 }
 
 .session-banner-connecting .session-banner-state,
 .session-banner-connecting strong,
-.session-banner-waiting .session-banner-state,
-.session-banner-waiting strong,
+.session-banner-starting .session-banner-state,
+.session-banner-starting strong,
+.session-banner-awaiting-approval .session-banner-state,
+.session-banner-awaiting-approval strong,
+.session-banner-awaiting-input .session-banner-state,
+.session-banner-awaiting-input strong,
 .session-banner-stopping .session-banner-state,
 .session-banner-stopping strong {
   color: #fbbf24;
@@ -251,6 +257,10 @@ textarea {
 
 .session-banner-idle .session-banner-state,
 .session-banner-idle strong,
+.session-banner-completed .session-banner-state,
+.session-banner-completed strong,
+.session-banner-disconnected .session-banner-state,
+.session-banner-disconnected strong,
 .session-banner-stopped .session-banner-state,
 .session-banner-stopped strong {
   color: var(--muted);

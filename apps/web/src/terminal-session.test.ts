@@ -20,6 +20,14 @@ describe("detectTerminalOutputState", () => {
     );
   });
 
+  it("recognizes when codex is waiting for the next user instruction", () => {
+    expect(detectTerminalOutputState("› Run /review on my current changes")).toBe("awaiting-input");
+  });
+
+  it("recognizes completion markers from codex output", () => {
+    expect(detectTerminalOutputState("Created only README.md.\n\n─ Worked for 1m 23s ─")).toBe("completed");
+  });
+
   it("recognizes active codex output", () => {
     expect(detectTerminalOutputState("Created only README.md.")).toBe("working");
   });

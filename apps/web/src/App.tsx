@@ -351,6 +351,14 @@ export function App() {
         const outputState = detectTerminalOutputState(message.payload);
         if (outputState === "approval") {
           setSessionBanner((current) => reduceSessionBanner(current, { type: "waiting-for-approval" }));
+        } else if (outputState === "awaiting-input") {
+          setSessionBanner((current) =>
+            reduceSessionBanner(current, { type: "waiting-for-input", repoPath: statusRef.current.repoPath })
+          );
+        } else if (outputState === "completed") {
+          setSessionBanner((current) =>
+            reduceSessionBanner(current, { type: "completion-detected", repoPath: statusRef.current.repoPath })
+          );
         } else if (outputState === "working") {
           setSessionBanner((current) =>
             reduceSessionBanner(current, { type: "activity-detected", repoPath: statusRef.current.repoPath })

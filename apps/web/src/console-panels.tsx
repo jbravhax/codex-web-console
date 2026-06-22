@@ -9,7 +9,7 @@ import type {
   SessionHistoryPanelProps
 } from "./app-types";
 import type { PendingContextItem } from "./pending-context-types";
-import type { SessionBanner } from "./session-banner";
+import { formatSessionBannerStateLabel, type SessionBanner } from "./session-banner";
 
 type PendingContextGroup = {
   key: PendingContextItem["kind"];
@@ -43,12 +43,20 @@ function formatZipSkipReason(reason: string): string {
 }
 
 function buildTerminalGuidance(sessionBanner: SessionBanner): string | null {
-  if (sessionBanner.title === "Approval needed") {
-    return "Approval is waiting inside the terminal. Review the request there, then press Enter to approve or Esc to cancel.";
+  if (sessionBanner.state === "awaiting-approval") {
+    return "Codex is paused for approval. Read the request in the terminal, approve it there with Enter or cancel with Esc, and Codex will continue automatically afterward.";
   }
 
-  if (sessionBanner.state === "waiting") {
-    return "Codex is still working through the current request. Watch the terminal for progress or approval prompts.";
+  if (sessionBanner.state === "awaiting-input") {
+    return "Codex has reached a stopping point and is waiting for your next instruction. Use the prompt box below or type directly in the terminal to continue.";
+  }
+
+  if (sessionBanner.state === "completed") {
+    return "The last request appears complete. Review the terminal result, then send another prompt when you're ready.";
+  }
+
+  if (sessionBanner.state === "running" || sessionBanner.state === "starting") {
+    return "Codex is active in the terminal below. Keep an eye on it for progress, follow-up questions, or approval prompts.";
   }
 
   return null;
@@ -88,7 +96,7 @@ export function ConsoleHeader({ activeView, onChangeView, sessionBanner }: Conso
           <strong>{sessionBanner.title}</strong>
           <p>{sessionBanner.detail}</p>
         </div>
-        <span className="session-banner-state">{sessionBanner.state}</span>
+        <span className="session-banner-state">{formatSessionBannerStateLabel(sessionBanner.state)}</span>
       </section>
     </>
   );
@@ -638,10 +646,10 @@ export function ConsoleView({
               <p className="section-kicker">Console</p>
               <h2>Live Codex terminal</h2>
             </div>
-            <div className="terminal-stage-meta">
-              <span className="section-chip">{status.active ? "Interactive" : "Waiting"}</span>
-            </div>
+          <div className="terminal-stage-meta">
+              <span className="section-chip">{status.active ? formatSessionBannerStateLabel(sessionBanner.state) : "Waiting"}</span>
           </div>
+        </div>
           {terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
           <div ref={terminalContainerRef} className="terminal-panel" />
         </section>

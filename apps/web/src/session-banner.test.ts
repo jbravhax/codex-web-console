@@ -25,7 +25,7 @@ describe("session banner state", () => {
       repoPath: "/workspace/project"
     });
 
-    expect(connecting.state).toBe("connecting");
+    expect(connecting.state).toBe("starting");
     expect(running).toEqual({
       state: "running",
       title: "Session running",
@@ -33,19 +33,44 @@ describe("session banner state", () => {
     });
   });
 
-  it("shows waiting states for prompt submission and terminal approvals", () => {
+  it("shows running and approval states while codex is working through a request", () => {
     const waitingForCodex = reduceSessionBanner(createInitialSessionBanner(), { type: "prompt-submitted" });
     const waitingForApproval = reduceSessionBanner(waitingForCodex, { type: "waiting-for-approval" });
 
     expect(waitingForCodex).toEqual({
-      state: "waiting",
-      title: "Waiting for Codex",
-      detail: "Prompt sent. Watch the terminal below. If Codex asks for approval, press Enter to approve or Esc to cancel."
+      state: "running",
+      title: "Running request",
+      detail: "Prompt sent. Codex is now working in the terminal below. If it needs approval or more input, the browser will call that out here."
     });
     expect(waitingForApproval).toEqual({
-      state: "waiting",
+      state: "awaiting-approval",
       title: "Approval needed",
-      detail: "Codex is waiting in the terminal below for your confirmation. Review the request, then press Enter to approve or Esc to cancel."
+      detail:
+        "Codex paused for approval. Review the request in the terminal below, then press Enter there to approve or Esc to cancel. After approval, Codex will continue automatically."
+    });
+  });
+
+  it("shows explicit waiting-for-input and completed states", () => {
+    const awaitingInput = reduceSessionBanner(createInitialSessionBanner(), {
+      type: "waiting-for-input",
+      repoPath: "/workspace/project"
+    });
+    const completed = reduceSessionBanner(awaitingInput, {
+      type: "completion-detected",
+      repoPath: "/workspace/project"
+    });
+
+    expect(awaitingInput).toEqual({
+      state: "awaiting-input",
+      title: "Waiting for your next input",
+      detail:
+        "Codex has finished the current step in /workspace/project and is waiting in the terminal for your next instruction. Type in the prompt box or interact directly with the terminal to continue."
+    });
+    expect(completed).toEqual({
+      state: "completed",
+      title: "Request completed",
+      detail:
+        "Codex appears to have finished the current request in /workspace/project. Review the terminal output, then send the next prompt when you're ready."
     });
   });
 
@@ -76,15 +101,15 @@ describe("session banner state", () => {
     expect(afterStatus).toEqual(stopped);
   });
 
-  it("shows failed status for websocket close when the app was not already stopping", () => {
+  it("shows disconnected status for websocket close when the app was not already stopping", () => {
     const failed = reduceSessionBanner(createInitialSessionBanner(), {
       type: "websocket-close",
       detail: "Connection to the local Codex server was closed. Restart the server if needed."
     });
 
     expect(failed).toEqual({
-      state: "failed",
-      title: "Connection lost",
+      state: "disconnected",
+      title: "Disconnected",
       detail: "Connection to the local Codex server was closed. Restart the server if needed."
     });
   });

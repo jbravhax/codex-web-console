@@ -1,4 +1,15 @@
-export type SessionBannerState = "idle" | "connecting" | "running" | "waiting" | "stopping" | "stopped" | "failed";
+export type SessionBannerState =
+  | "idle"
+  | "connecting"
+  | "starting"
+  | "running"
+  | "awaiting-approval"
+  | "awaiting-input"
+  | "completed"
+  | "stopping"
+  | "stopped"
+  | "disconnected"
+  | "failed";
 
 export type SessionBanner = {
   state: SessionBannerState;
@@ -13,11 +24,24 @@ type SessionBannerEvent =
   | { type: "prompt-submitted" }
   | { type: "status-received"; active: boolean; repoPath: string | null }
   | { type: "waiting-for-approval" }
+  | { type: "waiting-for-input"; repoPath: string | null }
+  | { type: "completion-detected"; repoPath: string | null }
   | { type: "activity-detected"; repoPath: string | null }
   | { type: "stop-requested" }
   | { type: "exit-received"; exitCode: number; signal: number }
   | { type: "websocket-close"; detail: string }
   | { type: "error-received"; detail: string };
+
+export function formatSessionBannerStateLabel(state: SessionBannerState): string {
+  switch (state) {
+    case "awaiting-approval":
+      return "Awaiting approval";
+    case "awaiting-input":
+      return "Awaiting input";
+    default:
+      return state.replace(/-/g, " ");
+  }
+}
 
 function formatRepoTarget(repoPath: string | null): string {
   return repoPath && repoPath.trim().length > 0 ? repoPath : "the selected repo";
@@ -46,7 +70,7 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
 
   if (event.type === "start-requested") {
     return {
-      state: "connecting",
+      state: "starting",
       title: "Starting session",
       detail: `Starting Codex in ${formatRepoTarget(event.repoPath)}. This needs to be a real project folder, not a broad parent directory.`
     };
@@ -54,9 +78,9 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
 
   if (event.type === "prompt-submitted") {
     return {
-      state: "waiting",
-      title: "Waiting for Codex",
-      detail: "Prompt sent. Watch the terminal below. If Codex asks for approval, press Enter to approve or Esc to cancel."
+      state: "running",
+      title: "Running request",
+      detail: "Prompt sent. Codex is now working in the terminal below. If it needs approval or more input, the browser will call that out here."
     };
   }
 
@@ -82,9 +106,26 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
 
   if (event.type === "waiting-for-approval") {
     return {
-      state: "waiting",
+      state: "awaiting-approval",
       title: "Approval needed",
-      detail: "Codex is waiting in the terminal below for your confirmation. Review the request, then press Enter to approve or Esc to cancel."
+      detail:
+        "Codex paused for approval. Review the request in the terminal below, then press Enter there to approve or Esc to cancel. After approval, Codex will continue automatically."
+    };
+  }
+
+  if (event.type === "waiting-for-input") {
+    return {
+      state: "awaiting-input",
+      title: "Waiting for your next input",
+      detail: `Codex has finished the current step in ${formatRepoTarget(event.repoPath)} and is waiting in the terminal for your next instruction. Type in the prompt box or interact directly with the terminal to continue.`
+    };
+  }
+
+  if (event.type === "completion-detected") {
+    return {
+      state: "completed",
+      title: "Request completed",
+      detail: `Codex appears to have finished the current request in ${formatRepoTarget(event.repoPath)}. Review the terminal output, then send the next prompt when you're ready.`
     };
   }
 
@@ -105,6 +146,22 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
   }
 
   if (event.type === "exit-received") {
+    if (previous.state === "stopping") {
+      return {
+        state: "stopped",
+        title: "Session stopped",
+        detail: `Codex exited with code ${event.exitCode} and signal ${event.signal}.`
+      };
+    }
+
+    if (event.exitCode === 0) {
+      return {
+        state: "completed",
+        title: "Session completed",
+        detail: "Codex exited cleanly after finishing the session."
+      };
+    }
+
     return {
       state: "stopped",
       title: "Session stopped",
@@ -122,8 +179,8 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
     }
 
     return {
-      state: "failed",
-      title: "Connection lost",
+      state: "disconnected",
+      title: "Disconnected",
       detail: event.detail
     };
   }

@@ -1,7 +1,7 @@
 const BRACKETED_PASTE_START = "\u001b[200~";
 const BRACKETED_PASTE_END = "\u001b[201~";
 
-export type TerminalOutputState = "approval" | "working" | "idle";
+export type TerminalOutputState = "approval" | "awaiting-input" | "completed" | "working" | "idle";
 
 function normalizePromptNewlines(prompt: string): string {
   return prompt.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -26,6 +26,23 @@ export function detectTerminalOutputState(output: string): TerminalOutputState {
     normalizedOutput.includes("allow ")
   ) {
     return "approval";
+  }
+
+  if (
+    normalizedOutput.includes("run /review on my current changes") ||
+    normalizedOutput.includes("run /") ||
+    normalizedOutput.includes("what should codex do next") ||
+    normalizedOutput.includes("waiting for your next instruction")
+  ) {
+    return "awaiting-input";
+  }
+
+  if (
+    normalizedOutput.includes("worked for ") ||
+    normalizedOutput.includes("exact contents:") ||
+    normalizedOutput.includes("final git status:")
+  ) {
+    return "completed";
   }
 
   if (normalizedOutput.trim().length > 0) {
