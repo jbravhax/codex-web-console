@@ -485,7 +485,7 @@ describe("App integration", () => {
       }
     });
 
-    expect(await screen.findByText(/Saved large pasted text to \.codex-web\/documents\/pasted-20260621-120000\.md\./)).toBeTruthy();
+    expect(await screen.findByText(/Saved 12,000 characters to \.codex-web\/documents\/pasted-20260621-120000\.md\./)).toBeTruthy();
     expect(screen.getByText("Large pasted documents")).toBeTruthy();
     expect(screen.getByText(".codex-web/documents/pasted-20260621-120000.md")).toBeTruthy();
   });
@@ -502,7 +502,11 @@ describe("App integration", () => {
       }
     });
 
-    expect(await screen.findByText("Could not save that pasted text. It is over the current 1MB limit, so split it into smaller pieces first.")).toBeTruthy();
+    expect(
+      await screen.findByText(
+        "Could not save that pasted text. It is over the current 1MB limit, so split it into smaller pieces, attach an existing file instead, or upload a ZIP for a larger project bundle."
+      )
+    ).toBeTruthy();
   });
 
   it("clears all pending context after adding a saved document", async () => {

@@ -4,13 +4,19 @@ import { friendlyUploadErrorMessage } from "./ui-messages";
 describe("friendlyUploadErrorMessage", () => {
   it("maps unsupported type errors to a friendly message", () => {
     expect(friendlyUploadErrorMessage("Could not upload attachment. Unsupported file type.")).toContain(
-      "Could not add that file"
+      "Paste short text directly"
     );
   });
 
   it("maps ZIP extraction failures to a clearer message", () => {
     expect(friendlyUploadErrorMessage("ZIP contains a path traversal entry, which is not allowed.")).toContain(
-      "Could not finish the ZIP upload"
+      "suspicious nested path"
+    );
+    expect(friendlyUploadErrorMessage("ZIP contains an absolute path entry, which is not allowed.")).toContain(
+      "stored with absolute paths"
+    );
+    expect(friendlyUploadErrorMessage("ZIP contains a symlink entry, which is not allowed.")).toContain(
+      "contains symlinks"
     );
   });
 
@@ -38,13 +44,13 @@ describe("friendlyUploadErrorMessage", () => {
 
   it("maps oversize pasted context errors to clearer guidance", () => {
     expect(friendlyUploadErrorMessage("Pasted content is too large. The current limit is 1MB.")).toContain(
-      "Could not save that pasted text"
+      "attach an existing file instead"
     );
   });
 
   it("maps attachment size limits to action-owned guidance", () => {
     expect(friendlyUploadErrorMessage("Could not upload attachment. Attachment exceeds the 10MB limit.")).toContain(
-      "Could not upload that file"
+      "attach a ZIP or trim the file first"
     );
   });
 });

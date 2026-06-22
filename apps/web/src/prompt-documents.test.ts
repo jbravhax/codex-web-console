@@ -6,8 +6,20 @@ describe("classifyPaste", () => {
     expect(classifyPaste("short paste")).toEqual({ kind: "small" });
   });
 
+  it("keeps 9,999 characters inline", () => {
+    expect(classifyPaste("a".repeat(9_999))).toEqual({ kind: "small" });
+  });
+
   it("treats 10,000 characters or more as a large paste", () => {
     expect(classifyPaste("a".repeat(10_000))).toEqual({ kind: "large" });
+  });
+
+  it("returns actionable guidance when a paste exceeds the byte limit", () => {
+    expect(classifyPaste("x".repeat(1_000_001))).toEqual({
+      kind: "too-large",
+      message:
+        "That paste is larger than 1MB. Split it into smaller pieces, attach an existing file instead, or upload a ZIP if this is a larger project bundle."
+    });
   });
 });
 

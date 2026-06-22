@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { PendingAttachment } from "./attachment-types";
 import { CopyTextError } from "./clipboard";
 import {
+  buildAttachmentAddedMessage,
   buildCopyFailureMessage,
   buildCopySuccessMessage,
+  buildLargePasteSavedMessage,
   buildZipUploadSuccessMessage,
   toErrorMessage
 } from "./app-feedback";
@@ -58,7 +60,20 @@ describe("app feedback helpers", () => {
   });
 
   it("builds a human-readable ZIP upload success message", () => {
-    expect(buildZipUploadSuccessMessage(zipAttachment)).toContain("3 reviewable files");
+    expect(buildZipUploadSuccessMessage(zipAttachment)).toContain("Accepted 3 reviewable files");
     expect(buildZipUploadSuccessMessage(zipAttachment)).toContain("2 files were skipped");
+    expect(buildZipUploadSuccessMessage(zipAttachment)).toContain("focus Codex on the extracted folder path");
+  });
+
+  it("builds a large-paste success message with threshold guidance", () => {
+    expect(buildLargePasteSavedMessage(".codex-web/documents/example.md", 12_345)).toContain("12,345 characters");
+    expect(buildLargePasteSavedMessage(".codex-web/documents/example.md", 12_345)).toContain(
+      "10,000 characters or more become local context files"
+    );
+  });
+
+  it("builds attachment success guidance that explains when to paste, attach, or ZIP", () => {
+    expect(buildAttachmentAddedMessage(".codex-web/attachments/files/notes.md")).toContain("Paste short notes directly");
+    expect(buildAttachmentAddedMessage(".codex-web/attachments/files/notes.md")).toContain("use ZIPs for larger repo or folder reviews");
   });
 });

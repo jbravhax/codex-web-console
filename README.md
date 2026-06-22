@@ -376,6 +376,13 @@ Current local limits:
 - ZIP total extracted size maximum: `100MB`
 - ZIP single extracted file maximum: `25MB`
 
+Recommended context workflow:
+
+- Paste short notes or short instructions directly into the prompt box.
+- If text is already in a local file, attach the file instead of pasting the whole contents.
+- If you are sharing a larger folder, repo snapshot, or many related files, use a ZIP upload instead of many individual attachments.
+- The `10,000` character threshold is a UI readability cutoff, not a model limit. It keeps the prompt composer usable and turns larger pasted context into a local file reference automatically.
+
 Unsupported files inside ZIP uploads are skipped and recorded in extraction metadata instead of failing the whole upload.
 The UI summarizes skipped files in human-readable language so you can tell what was excluded and why.
 

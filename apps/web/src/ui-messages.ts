@@ -19,19 +19,19 @@ export function friendlyUploadErrorMessage(message: string): string {
   }
 
   if (normalizedMessage.includes("Unsupported file type") || normalizedMessage.includes("not supported for attachments")) {
-    return "Could not add that file. Use a supported document, image, PDF, or ZIP file.";
+    return "Could not add that file. Paste short text directly, attach a supported document/image/PDF as a file, or use a ZIP when you want Codex to inspect a larger folder or repo.";
   }
 
   if (normalizedMessage.includes("1MB")) {
-    return "Could not save that pasted text. It is over the current 1MB limit, so split it into smaller pieces first.";
+    return "Could not save that pasted text. It is over the current 1MB limit, so split it into smaller pieces, attach an existing file instead, or upload a ZIP for a larger project bundle.";
   }
 
   if (normalizedMessage.includes("10MB")) {
-    return "Could not upload that file. Regular attachments currently support up to 10MB.";
+    return "Could not upload that file. Regular attachments currently support up to 10MB. For larger project context, attach a ZIP or trim the file first.";
   }
 
   if (normalizedMessage.includes("50MB")) {
-    return "Could not upload that ZIP file. ZIP uploads currently support up to 50MB.";
+    return "Could not upload that ZIP file. ZIP uploads currently support up to 50MB. Trim large binaries or split the archive into smaller reviewable parts.";
   }
 
   if (normalizedMessage.includes("Start a Codex session before")) {
@@ -68,6 +68,30 @@ export function friendlyUploadErrorMessage(message: string): string {
 
   if (normalizedMessage.includes("Attachment is empty") || normalizedMessage.includes("Pasted content is empty")) {
     return "That item is empty, so there is nothing useful to send to Codex.";
+  }
+
+  if (normalizedMessage.includes("path traversal")) {
+    return "Could not finish the ZIP upload. The archive contains a suspicious nested path that could escape the extracted folder. Re-create the ZIP from a normal project folder and try again.";
+  }
+
+  if (normalizedMessage.includes("absolute path entry")) {
+    return "Could not finish the ZIP upload. The archive contains files stored with absolute paths, which is unsafe to extract here. Re-create the ZIP from inside the project folder and try again.";
+  }
+
+  if (normalizedMessage.includes("symlink")) {
+    return "Could not finish the ZIP upload. The archive contains symlinks, which are blocked for safety. Re-create the ZIP with regular files only and try again.";
+  }
+
+  if (normalizedMessage.includes("too many extractable files")) {
+    return "Could not finish the ZIP upload. The archive contains more than 2,000 reviewable files. Split it into smaller parts or narrow it to the area you want Codex to inspect.";
+  }
+
+  if (normalizedMessage.includes("100MB total extracted size")) {
+    return "Could not finish the ZIP upload. The reviewable contents exceed the current 100MB extracted-size limit. Remove large generated artifacts or split the archive into smaller pieces.";
+  }
+
+  if (normalizedMessage.includes("25MB extracted-file limit")) {
+    return "Could not finish the ZIP upload. At least one extracted file is over the current 25MB per-file limit. Trim that file or remove large build artifacts before zipping.";
   }
 
   if (normalizedMessage.includes("ZIP")) {

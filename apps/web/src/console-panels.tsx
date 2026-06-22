@@ -432,13 +432,16 @@ export function ComposerPanel({
           <p className="helper-text">
             Write the task, attach supporting context, and review the final assembled prompt before sending it.
           </p>
+          <p className="helper-text">
+            Paste short notes directly. Attach standalone files for existing documents, logs, images, or PDFs. Use a ZIP when you want Codex to inspect a larger folder or repository snapshot.
+          </p>
           {terminalGuidance ? <p className="helper-text composer-guidance">{terminalGuidance}</p> : null}
         </div>
         <div className="attachment-actions">
           <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={!status.active}>
             Attach files
           </button>
-          <span className="helper-text">Drop files here, use the picker, or paste an image directly into the prompt box.</span>
+          <span className="helper-text">Drop files here, use the picker, or paste an image directly into the prompt box. ZIPs work best for multi-file repo context.</span>
         </div>
       </div>
       <input
@@ -517,7 +520,7 @@ export function ComposerPanel({
           Send prompt
         </button>
         <span className="helper-text">
-          Pasted text under 10,000 characters stays inline. Larger pastes become local files automatically.
+          Pasted text under 10,000 characters stays inline. At 10,000 characters or more it becomes a local context file automatically. Use file upload for existing documents and ZIPs for larger code bundles.
         </span>
       </div>
       {contextMessage ? <p className="success-banner">{contextMessage}</p> : null}

@@ -4,8 +4,10 @@ import { FitAddon } from "@xterm/addon-fit";
 import { createPastedImageFileName, isSupportedAttachmentName } from "./attachments";
 import type { PendingAttachment } from "./attachment-types";
 import {
+  buildAttachmentAddedMessage,
   buildCopyFailureMessage,
   buildCopySuccessMessage,
+  buildLargePasteSavedMessage,
   buildZipUploadSuccessMessage,
   toErrorMessage
 } from "./app-feedback";
@@ -554,9 +556,7 @@ export function App() {
       const separator = current.trim().length > 0 ? "\n" : "";
       return `${current}${separator}${buildDocumentReference(document.relativePath)}`;
     });
-    setContextMessage(
-      `Saved large pasted text to ${document.relativePath}. Codex will receive this as a file reference instead of the full paste inline.`
-    );
+    setContextMessage(buildLargePasteSavedMessage(document.relativePath, document.charCount));
   };
 
   const uploadAttachment = async (file: File, overrideFileName?: string) => {
@@ -624,7 +624,9 @@ export function App() {
       if (attachment.kind === "zip") {
         setContextMessage(buildZipUploadSuccessMessage(attachment));
       } else {
-        setContextMessage(`Added ${attachment.relativePath} to the next prompt.`);
+        setContextMessage(
+          buildAttachmentAddedMessage(attachment.relativePath, attachment.mimeType.startsWith("image/") ? "image" : "file")
+        );
       }
     } catch (requestError) {
       setPendingContextItems((current) => removePendingContextById(current, uploadId));

@@ -1,5 +1,8 @@
 import { buildDocumentPromptBlocks } from "./prompt-context";
 
+// 10,000 characters is the point where inline prompt editing starts to feel clumsy
+// in this UI. Above that, saving to a local markdown document keeps the prompt box
+// readable while still giving Codex the full context by reference.
 export const LARGE_PASTE_CHAR_THRESHOLD = 10_000;
 export const MAX_PASTE_BYTES = 1_000_000;
 
@@ -19,7 +22,8 @@ export function classifyPaste(content: string): PasteHandling {
   if (byteCount > MAX_PASTE_BYTES) {
     return {
       kind: "too-large",
-      message: "That paste is larger than 1MB. Split it into smaller pieces before saving it as context."
+      message:
+        "That paste is larger than 1MB. Split it into smaller pieces, attach an existing file instead, or upload a ZIP if this is a larger project bundle."
     };
   }
 
