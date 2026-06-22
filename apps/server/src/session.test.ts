@@ -114,6 +114,22 @@ describe("SessionManager", () => {
     expect(manager.listSessions(1)[0]?.repoPath).toBe(repoPath);
   });
 
+  it("stores cleaned transcript output instead of raw terminal escape sequences", () => {
+    const repoPath = makeProjectDir("codex-web-session-");
+    createdProjectPaths.push(repoPath);
+    const fakePty = new FakePtyProcess();
+    spawnMock.mockReturnValue(fakePty);
+    const manager = new SessionManager(() => makeConfig());
+    managersToCleanup.push(manager);
+
+    const session = manager.start("owner-clean-transcript", repoPath);
+    manager.appendOutput("owner-clean-transcript", "\u001b[31mError\u001b[39m\n");
+    manager.appendOutput("owner-clean-transcript", "\u001b[2J\u001b[1;1HCreated README.md");
+    manager.clear("owner-clean-transcript");
+
+    expect(fs.readFileSync(session.transcriptPath, "utf8")).toBe("Error\nCreated README.md");
+  });
+
   it("ignores transcript writes after a session is cleared", () => {
     const repoPath = makeProjectDir("codex-web-session-");
     createdProjectPaths.push(repoPath);

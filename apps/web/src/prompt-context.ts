@@ -14,11 +14,16 @@ export function buildReviewFilesPromptBlock(relativePaths: string[]): string {
   ].join("\n");
 }
 
-export function buildZipPromptBlock(relativePath: string, extractedFolderRelativePath: string): string {
+export function buildZipPromptBlock(
+  relativePath: string,
+  extractedFolderRelativePath: string,
+  extractedFileCount: number
+): string {
   return [
     "Attached ZIP for review:",
     `- Original ZIP: ${relativePath}`,
     `- Extracted folder: ${extractedFolderRelativePath}/`,
+    `- Extracted file count: ${extractedFileCount}`,
     "",
     "Please inspect the extracted folder as part of the task."
   ].join("\n");
@@ -39,7 +44,7 @@ export function buildAttachmentPromptBlocks(attachments: PendingAttachment[]): s
 
   blocks.push(
     ...zipAttachments.map((attachment) =>
-      buildZipPromptBlock(attachment.relativePath, attachment.extractedFolderRelativePath)
+      buildZipPromptBlock(attachment.relativePath, attachment.extractedFolderRelativePath, attachment.extractedFileCount)
     )
   );
 

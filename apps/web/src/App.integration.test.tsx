@@ -4,6 +4,7 @@ import { App } from "./App";
 import { loadGitDiff } from "./git-diff-viewer";
 import { REPO_PICKER_UNSUPPORTED_MESSAGE, chooseRepoDirectory } from "./repo-picker";
 import { loadSessionTranscript } from "./session-transcripts";
+import { buildSubmittedPromptInput } from "./terminal-session";
 
 vi.mock("@xterm/xterm", () => {
   class TerminalMock {
@@ -114,8 +115,9 @@ function installFetchMock(overrides?: {
   recentProjects?: unknown;
   sessions?: unknown;
   gitStatus?: unknown;
+  documents?: { ok: boolean; payload: unknown };
 }) {
-  const fetchMock = vi.fn(async (input: string) => {
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     if (input === "/api/settings") {
       return createFetchResponse(
         overrides?.settings ?? {
@@ -146,6 +148,17 @@ function installFetchMock(overrides?: {
           stagedFilesCount: 0,
           untrackedFilesCount: 0
         }
+      );
+    }
+
+    if (input === "/api/documents" && init?.method === "POST") {
+      return createFetchResponse(
+        overrides?.documents?.payload ?? {
+          filePath: "/workspace/default-project/.codex-web/documents/pasted-20260621-120000.md",
+          relativePath: ".codex-web/documents/pasted-20260621-120000.md",
+          charCount: 12000
+        },
+        overrides?.documents?.ok ?? true
       );
     }
 
@@ -259,11 +272,119 @@ describe("App integration", () => {
       }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
 
     expect(await screen.findByText("Full generated prompt")).toBeTruthy();
     expect(screen.getByText("User prompt text")).toBeTruthy();
     expect(screen.getAllByText("Review this repository").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("submits the prompt in one send action and shows waiting banner updates", async () => {
+    const socket = renderApp();
+    emitSessionStatus(socket, true, "/workspace/default-project");
+
+    fireEvent.change(screen.getByLabelText("Prompt"), {
+      target: {
+        value: "Reply with exactly: OK"
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send prompt" }));
+
+    expect(await screen.findByText("Waiting for Codex")).toBeTruthy();
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        type: "input",
+        data: buildSubmittedPromptInput("Reply with exactly: OK")
+      })
+    );
+
+    socket.emitMessage({
+      type: "output",
+      payload: "Would you like to run the following command?\nPress enter to confirm"
+    });
+    expect(await screen.findByText("Waiting for approval")).toBeTruthy();
+
+    socket.emitMessage({
+      type: "output",
+      payload: "Created only README.md."
+    });
+    expect(await screen.findByText("Codex is responding")).toBeTruthy();
+  });
+
+  it("shows specific repo validation errors instead of generic attachment guidance", async () => {
+    const socket = renderApp();
+
+    socket.emitMessage({
+      type: "error",
+      payload: "The path does not exist: /workspace/missing-project"
+    });
+
+    const repoPathMessages = await screen.findAllByText(/That path does not exist yet/i);
+    expect(repoPathMessages.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows an empty preview state when nothing is queued", async () => {
+    const socket = renderApp();
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Session running")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
+
+    expect(await screen.findByText("Nothing queued yet")).toBeTruthy();
+    expect(screen.getByText("Nothing will be sent yet. Add a prompt or context to build the final message.")).toBeTruthy();
+  });
+
+  it("saves large pasted text as document context and explains the file reference", async () => {
+    const socket = renderApp();
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Session running")).toBeTruthy();
+
+    fireEvent.paste(screen.getByLabelText("Prompt"), {
+      clipboardData: {
+        items: [],
+        getData: () => "x".repeat(10000)
+      }
+    });
+
+    expect(await screen.findByText(/Saved large pasted text to \.codex-web\/documents\/pasted-20260621-120000\.md\./)).toBeTruthy();
+    expect(screen.getByText("Large pasted documents")).toBeTruthy();
+    expect(screen.getByText(".codex-web/documents/pasted-20260621-120000.md")).toBeTruthy();
+  });
+
+  it("shows a friendly large-paste failure message", async () => {
+    const socket = renderApp();
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Session running")).toBeTruthy();
+
+    fireEvent.paste(screen.getByLabelText("Prompt"), {
+      clipboardData: {
+        items: [],
+        getData: () => "x".repeat(1024 * 1024 + 1)
+      }
+    });
+
+    expect(await screen.findByText("Could not save that pasted text. It is over the current 1MB limit, so split it into smaller pieces first.")).toBeTruthy();
+  });
+
+  it("clears all pending context after adding a saved document", async () => {
+    const socket = renderApp();
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Session running")).toBeTruthy();
+
+    fireEvent.paste(screen.getByLabelText("Prompt"), {
+      clipboardData: {
+        items: [],
+        getData: () => "x".repeat(10000)
+      }
+    });
+
+    expect(await screen.findByText("Large pasted documents")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+
+    expect(await screen.findByText("Cleared all pending context for the next prompt.")).toBeTruthy();
+    expect(screen.queryByText("Large pasted documents")).toBeNull();
   });
 
   it("loads a transcript successfully and shows transcript errors gracefully", async () => {

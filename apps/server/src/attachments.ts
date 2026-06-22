@@ -28,12 +28,50 @@ const SUPPORTED_REVIEW_EXTENSIONS = new Set([
   ".xml",
   ".yaml",
   ".yml",
+  ".toml",
+  ".ini",
+  ".properties",
+  ".sql",
+  ".gradle",
+  ".kts",
+  ".lock",
   ".png",
   ".jpg",
   ".jpeg",
   ".webp",
-  ".pdf"
+  ".pdf",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".py",
+  ".go",
+  ".java",
+  ".kt",
+  ".rs",
+  ".cs",
+  ".csproj",
+  ".sln",
+  ".cpp",
+  ".c",
+  ".h",
+  ".hpp",
+  ".php",
+  ".rb",
+  ".swift",
+  ".scala",
+  ".sh",
+  ".ps1",
+  ".psm1"
 ]);
+
+const SUPPORTED_REVIEW_BASENAMES = new Set(["dockerfile", "makefile", "pipfile", "readme", "license"]);
+
+const SKIP_REASON_UNSUPPORTED_TYPE = "unsupported-type";
+
+type ZipSkipReasonCounts = Record<string, number>;
 
 type AttachmentInput = {
   repoPath: string;
@@ -55,6 +93,9 @@ type ZipMetadata = {
   extractedFileCount: number;
   skippedFileCount: number;
   skippedFiles: string[];
+  skippedReasonCounts: ZipSkipReasonCounts;
+  extractedFiles: string[];
+  treePreview: string[];
   totalExtractedBytes: number;
   createdAt: string;
   limitsApplied: ZipExtractionLimits;
@@ -87,6 +128,9 @@ export type SavedZipAttachment = {
   extractedFileCount: number;
   skippedFileCount: number;
   skippedFiles: string[];
+  skippedReasonCounts: ZipSkipReasonCounts;
+  extractedFiles: string[];
+  treePreview: string[];
   totalExtractedBytes: number;
   metadataRelativePath: string;
   metadataAbsolutePath: string;
@@ -118,14 +162,13 @@ export function sanitizeFileName(inputName: string): string {
 }
 
 function ensureAllowedReviewExtension(fileName: string): string {
-  const extension = path.extname(fileName).toLowerCase();
-  if (!SUPPORTED_REVIEW_EXTENSIONS.has(extension)) {
+  if (!supportedExtractedFile(fileName)) {
     throw new Error(
-      "Unsupported file type. Allowed types: .txt, .md, .json, .csv, .log, .xml, .yaml, .yml, .png, .jpg, .jpeg, .webp, .pdf, .zip."
+      "Unsupported file type. Allowed types include common text, image, document, source-code, script, config, and ZIP files."
     );
   }
 
-  return extension;
+  return path.extname(fileName).toLowerCase();
 }
 
 function isZipFileName(fileName: string): boolean {
@@ -158,8 +201,33 @@ function isSymlinkEntry(entry: yauzl.Entry): boolean {
 }
 
 function supportedExtractedFile(fileName: string): boolean {
+  const lowerName = path.posix.basename(fileName).toLowerCase();
+  if (SUPPORTED_REVIEW_BASENAMES.has(lowerName) || lowerName.startsWith("readme.") || lowerName.startsWith("license.")) {
+    return true;
+  }
+
   const extension = path.extname(fileName).toLowerCase();
   return SUPPORTED_REVIEW_EXTENSIONS.has(extension);
+}
+
+function recordSkipReason(skipReasonCounts: ZipSkipReasonCounts, reason: string): void {
+  skipReasonCounts[reason] = (skipReasonCounts[reason] ?? 0) + 1;
+}
+
+function buildTreePreview(extractedFiles: string[]): string[] {
+  const preview = extractedFiles
+    .slice(0, 40)
+    .map((filePath) => {
+      const depth = Math.max(0, filePath.split("/").length - 1);
+      const label = path.posix.basename(filePath);
+      return `${"  ".repeat(depth)}- ${label}`;
+    });
+
+  if (extractedFiles.length > 40) {
+    preview.push(`... ${extractedFiles.length - 40} more file(s)`);
+  }
+
+  return preview;
 }
 
 function streamFromZipEntry(zipFile: yauzl.ZipFile, entry: yauzl.Entry): Promise<Readable> {
@@ -184,6 +252,9 @@ async function extractZipContents(
   extractedFileCount: number;
   skippedFileCount: number;
   skippedFiles: string[];
+  skippedReasonCounts: ZipSkipReasonCounts;
+  extractedFiles: string[];
+  treePreview: string[];
   totalExtractedBytes: number;
   metadataRelativePath: string;
   metadataAbsolutePath: string;
@@ -200,6 +271,8 @@ async function extractZipContents(
   });
 
   const skippedFiles: string[] = [];
+  const skippedReasonCounts: ZipSkipReasonCounts = {};
+  const extractedFiles: string[] = [];
   let extractedFileCount = 0;
   let totalExtractedBytes = 0;
   const createdAt = new Date().toISOString();
@@ -239,6 +312,7 @@ async function extractZipContents(
 
         if (!supportedExtractedFile(entry.fileName)) {
           skippedFiles.push(entry.fileName);
+          recordSkipReason(skippedReasonCounts, SKIP_REASON_UNSUPPORTED_TYPE);
           zipFile.readEntry();
           return;
         }
@@ -268,6 +342,7 @@ async function extractZipContents(
 
         extractedFileCount += 1;
         totalExtractedBytes += entry.uncompressedSize;
+        extractedFiles.push(normalizedEntry);
         zipFile.readEntry();
       } catch (error) {
         done(error instanceof Error ? error : new Error("Could not safely extract ZIP archive."));
@@ -291,6 +366,9 @@ async function extractZipContents(
     extractedFileCount,
     skippedFileCount: skippedFiles.length,
     skippedFiles,
+    skippedReasonCounts,
+    extractedFiles,
+    treePreview: buildTreePreview(extractedFiles),
     totalExtractedBytes,
     createdAt,
     limitsApplied: ZIP_LIMITS
@@ -302,6 +380,9 @@ async function extractZipContents(
     extractedFileCount,
     skippedFileCount: skippedFiles.length,
     skippedFiles,
+    skippedReasonCounts,
+    extractedFiles,
+    treePreview: metadata.treePreview,
     totalExtractedBytes,
     metadataRelativePath,
     metadataAbsolutePath
@@ -419,6 +500,9 @@ export async function saveZipAttachment(input: AttachmentInput): Promise<SavedZi
       extractedFileCount: extraction.extractedFileCount,
       skippedFileCount: extraction.skippedFileCount,
       skippedFiles: extraction.skippedFiles,
+      skippedReasonCounts: extraction.skippedReasonCounts,
+      extractedFiles: extraction.extractedFiles,
+      treePreview: extraction.treePreview,
       totalExtractedBytes: extraction.totalExtractedBytes,
       metadataRelativePath: extraction.metadataRelativePath,
       metadataAbsolutePath: extraction.metadataAbsolutePath

@@ -9,6 +9,8 @@ type AttachmentBase = {
   createdAt: string;
 };
 
+export type ZipSkipReasonCounts = Record<string, number>;
+
 export type PendingAttachment =
   | (AttachmentBase & {
       kind: "file";
@@ -20,6 +22,9 @@ export type PendingAttachment =
       extractedFileCount: number;
       skippedFileCount: number;
       skippedFiles: string[];
+      skippedReasonCounts: ZipSkipReasonCounts;
+      extractedFiles: string[];
+      treePreview: string[];
       totalExtractedBytes: number;
       metadataRelativePath: string;
       metadataAbsolutePath: string;

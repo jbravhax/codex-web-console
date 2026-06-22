@@ -14,5 +14,8 @@ export type PendingContextItem = {
   detailLine: string;
   warningText?: string;
   extractedFolderRelativePath?: string;
+  extractedFileCount?: number;
+  skippedReasonCounts?: Record<string, number>;
+  treePreview?: string[];
   promptLines: string[];
 };

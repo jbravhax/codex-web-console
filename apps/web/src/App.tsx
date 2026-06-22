@@ -48,6 +48,7 @@ import {
 import { createInitialSessionBanner, reduceSessionBanner, type SessionBanner } from "./session-banner";
 import { buildSessionWebSocketUrl } from "./session-connection";
 import { copyTranscriptText, loadSessionTranscript } from "./session-transcripts";
+import { buildSubmittedPromptInput, detectTerminalOutputState } from "./terminal-session";
 import { friendlyUploadErrorMessage } from "./ui-messages";
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -332,6 +333,14 @@ export function App() {
 
       if (message.type === "output") {
         terminalRef.current?.write(message.payload);
+        const outputState = detectTerminalOutputState(message.payload);
+        if (outputState === "approval") {
+          setSessionBanner((current) => reduceSessionBanner(current, { type: "waiting-for-approval" }));
+        } else if (outputState === "working") {
+          setSessionBanner((current) =>
+            reduceSessionBanner(current, { type: "activity-detected", repoPath: statusRef.current.repoPath })
+          );
+        }
         return;
       }
 
@@ -478,7 +487,9 @@ export function App() {
       const separator = current.trim().length > 0 ? "\n" : "";
       return `${current}${separator}${buildDocumentReference(document.relativePath)}`;
     });
-    setContextMessage(`Saved large pasted context to ${document.relativePath}.`);
+    setContextMessage(
+      `Saved large pasted text to ${document.relativePath}. Codex will receive this as a file reference instead of the full paste inline.`
+    );
   };
 
   const uploadAttachment = async (file: File, overrideFileName?: string) => {
@@ -543,7 +554,17 @@ export function App() {
       setPendingContextItems((current) =>
         replaceUploadingItem(current, uploadId, createPendingContextItemFromAttachment(attachment))
       );
-      setContextMessage(`Attached ${attachment.relativePath}.`);
+      if (attachment.kind === "zip") {
+        const skippedSummary =
+          attachment.skippedFileCount > 0
+            ? ` ${attachment.skippedFileCount.toLocaleString()} file${attachment.skippedFileCount === 1 ? " was" : "s were"} skipped.`
+            : "";
+        setContextMessage(
+          `Uploaded ${attachment.fileName} and extracted ${attachment.extractedFileCount.toLocaleString()} reviewable file${attachment.extractedFileCount === 1 ? "" : "s"} to ${attachment.extractedFolderRelativePath}/.${skippedSummary}`
+        );
+      } else {
+        setContextMessage(`Added ${attachment.relativePath} to the next prompt.`);
+      }
     } catch (requestError) {
       setPendingContextItems((current) => removePendingContextById(current, uploadId));
       throw requestError;
@@ -570,7 +591,9 @@ export function App() {
       } catch (requestError) {
         setError(
           friendlyUploadErrorMessage(
-            requestError instanceof Error ? requestError.message : "Could not save pasted image."
+            requestError instanceof Error
+              ? `Could not save pasted image. ${requestError.message}`
+              : "Could not save pasted image."
           )
         );
       }
@@ -587,7 +610,7 @@ export function App() {
     event.preventDefault();
 
     if (pasteHandling.kind === "too-large") {
-      setError(pasteHandling.message);
+      setError(friendlyUploadErrorMessage(pasteHandling.message));
       return;
     }
 
@@ -599,7 +622,9 @@ export function App() {
     } catch (requestError) {
       setError(
         friendlyUploadErrorMessage(
-          requestError instanceof Error ? requestError.message : "Could not save pasted document."
+          requestError instanceof Error
+            ? `Could not save pasted context. ${requestError.message}`
+            : "Could not save pasted context."
         )
       );
     }
@@ -620,7 +645,11 @@ export function App() {
       }
     } catch (requestError) {
       setError(
-        friendlyUploadErrorMessage(requestError instanceof Error ? requestError.message : "Could not upload attachment.")
+        friendlyUploadErrorMessage(
+          requestError instanceof Error
+            ? `Could not upload attachment. ${requestError.message}`
+            : "Could not upload attachment."
+        )
       );
     } finally {
       event.target.value = "";
@@ -644,7 +673,9 @@ export function App() {
     } catch (requestError) {
       setError(
         friendlyUploadErrorMessage(
-          requestError instanceof Error ? requestError.message : "Could not upload dropped files."
+          requestError instanceof Error
+            ? `Could not upload dropped files. ${requestError.message}`
+            : "Could not upload dropped files."
         )
       );
     }
@@ -682,7 +713,7 @@ export function App() {
 
   const clearAllPendingContext = () => {
     setPendingContextItems(clearPendingContext());
-    setContextMessage("Cleared all pending context references.");
+    setContextMessage("Cleared all pending context for the next prompt.");
   };
 
   const copyItemRelativePath = async (relativePath: string) => {
@@ -714,7 +745,8 @@ export function App() {
 
     setError("");
     setContextMessage("");
-    socketRef.current?.send(JSON.stringify({ type: "input", data: `${composedPrompt}\r` }));
+    socketRef.current?.send(JSON.stringify({ type: "input", data: buildSubmittedPromptInput(composedPrompt) }));
+    setSessionBanner((current) => reduceSessionBanner(current, { type: "prompt-submitted" }));
     terminalRef.current?.writeln(`\n[web prompt sent]\n${composedPrompt}\n`);
     setPromptText("");
     setPendingContextItems([]);
@@ -724,7 +756,7 @@ export function App() {
   const copyPromptPreview = async () => {
     try {
       await copyGeneratedPromptContext(generatedPromptPreview);
-      setContextMessage("Copied the generated prompt context.");
+      setContextMessage("Copied exactly what Codex will receive.");
       setError("");
     } catch {
       setError("Could not copy the generated prompt context. Your browser may have blocked clipboard access.");
@@ -813,11 +845,11 @@ export function App() {
   };
 
   const pendingContextEmptyState = !status.active
-    ? "Start a session, then paste text, drop files, or upload context for Codex."
-    : "Paste text, drop files, or upload context for Codex.";
+    ? "Start a session in a real project folder, then add documents, files, images, or ZIP context for Codex."
+    : "Paste text, drop files, upload images, or add a ZIP for Codex to inspect.";
   const promptPreviewSummary = generatedPromptPreview.trim()
-    ? `${promptText.trim() ? "Prompt ready" : "Context ready"} with ${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"}.`
-    : "Nothing will be sent yet.";
+    ? `${promptText.trim() ? "Prompt ready" : "Context ready"} with ${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"} prepared for Codex.`
+    : "Nothing will be sent yet. Add a prompt or context to preview the final message.";
 
   return (
     <div className="app-shell">

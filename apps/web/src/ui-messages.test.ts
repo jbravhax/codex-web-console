@@ -3,12 +3,14 @@ import { friendlyUploadErrorMessage } from "./ui-messages";
 
 describe("friendlyUploadErrorMessage", () => {
   it("maps unsupported type errors to a friendly message", () => {
-    expect(friendlyUploadErrorMessage("Unsupported file type.")).toContain("not supported here");
+    expect(friendlyUploadErrorMessage("Could not upload attachment. Unsupported file type.")).toContain(
+      "Could not add that file"
+    );
   });
 
   it("maps ZIP extraction failures to a clearer message", () => {
     expect(friendlyUploadErrorMessage("ZIP contains a path traversal entry, which is not allowed.")).toContain(
-      "ZIP extraction failed"
+      "Could not finish the ZIP upload"
     );
   });
 
@@ -18,9 +20,26 @@ describe("friendlyUploadErrorMessage", () => {
     );
   });
 
+  it("preserves actionable repo path validation guidance", () => {
+    expect(friendlyUploadErrorMessage("The path does not exist: /workspace/missing")).toContain(
+      "Create the folder first"
+    );
+    expect(
+      friendlyUploadErrorMessage(
+        "That folder does not look like a project yet. Expected one of: .git, package.json, pyproject.toml, Cargo.toml, or README.md."
+      )
+    ).toContain("does not look like a project yet");
+  });
+
   it("maps oversize pasted context errors to clearer guidance", () => {
     expect(friendlyUploadErrorMessage("Pasted content is too large. The current limit is 1MB.")).toContain(
-      "pasted text is too large"
+      "Could not save that pasted text"
+    );
+  });
+
+  it("maps attachment size limits to action-owned guidance", () => {
+    expect(friendlyUploadErrorMessage("Could not upload attachment. Attachment exceeds the 10MB limit.")).toContain(
+      "Could not upload that file"
     );
   });
 });

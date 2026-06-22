@@ -4,6 +4,7 @@ import path from "node:path";
 import pty, { type IPty } from "node-pty";
 import type { AppConfig } from "./config.js";
 import { validateRepoPath } from "./repo-paths.js";
+import { stripTerminalSequences } from "./transcript-cleaner.js";
 
 export type SessionStatus = {
   active: boolean;
@@ -179,7 +180,12 @@ export class SessionManager {
       return;
     }
 
-    fs.appendFileSync(session.transcriptPath, data, "utf8");
+    const cleanedOutput = stripTerminalSequences(data);
+    if (!cleanedOutput) {
+      return;
+    }
+
+    fs.appendFileSync(session.transcriptPath, cleanedOutput, "utf8");
   }
 
   clear(ownerId: string): void {
@@ -225,7 +231,7 @@ export class SessionManager {
     ensureSessionsRoot();
     const transcriptPath = path.join(SESSIONS_ROOT, sessionId, "transcript.txt");
     try {
-      return fs.readFileSync(transcriptPath, "utf8");
+      return stripTerminalSequences(fs.readFileSync(transcriptPath, "utf8"));
     } catch {
       return null;
     }

@@ -41,6 +41,11 @@ const zipAttachment: PendingAttachment = {
   extractedFileCount: 3,
   skippedFileCount: 1,
   skippedFiles: ["bin/tool.exe"],
+  skippedReasonCounts: {
+    "unsupported-type": 1
+  },
+  extractedFiles: ["package.json", "src/index.ts", "README.md"],
+  treePreview: ["- package.json", "- README.md", "  - index.ts"],
   totalExtractedBytes: 1024,
   metadataRelativePath: ".codex-web/attachments/extracted/bundle/extraction-metadata.json",
   metadataAbsolutePath: "/tmp/bundle/extraction-metadata.json"
@@ -72,6 +77,7 @@ describe("pending context model", () => {
     expect(prompt).toContain(".codex-web/attachments/files/notes.md");
     expect(prompt).toContain("Attached ZIP for review:");
     expect(prompt).toContain(".codex-web/attachments/extracted/bundle/");
+    expect(prompt).toContain("Extracted file count: 3");
     expect(prompt).toContain("Large pasted context was saved to: .codex-web/documents/pasted-20260621-120000.md");
     expect(prompt).toContain("Please review this");
   });
@@ -106,7 +112,9 @@ describe("pending context model", () => {
     ]);
 
     expect(previewLines).toContain("Attached file: .codex-web/attachments/files/notes.md");
-    expect(previewLines).toContain("ZIP review: .codex-web/attachments/zips/bundle.zip");
+    expect(previewLines).toContain(
+      "ZIP review: .codex-web/attachments/zips/bundle.zip (3 extracted, with skipped files)"
+    );
     expect(previewLines).toContain("Saved pasted context: .codex-web/documents/pasted-20260621-120000.md");
   });
 
@@ -173,7 +181,15 @@ describe("pending context model", () => {
       {
         label: "ZIP extracted folder paths",
         lines: [".codex-web/attachments/extracted/bundle/"]
+      },
+      {
+        label: "ZIP extraction summary",
+        lines: ["bundle.zip: 3 extracted, Some ZIP entries were skipped. 1 unsupported-type"]
       }
     ]);
+  });
+
+  it("returns no preview sections when both prompt and context are empty", () => {
+    expect(buildPromptPreviewSections("", [])).toEqual([]);
   });
 });

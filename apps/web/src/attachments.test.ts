@@ -33,6 +33,11 @@ const sampleZipAttachment: PendingAttachment = {
   extractedFileCount: 3,
   skippedFileCount: 1,
   skippedFiles: ["bin/tool.exe"],
+  skippedReasonCounts: {
+    "unsupported-type": 1
+  },
+  extractedFiles: ["src/index.ts", "package.json", "README.md"],
+  treePreview: ["- package.json", "- README.md", "  - index.ts"],
   totalExtractedBytes: 1024,
   metadataRelativePath: ".codex-web/attachments/extracted/bundle/extraction-metadata.json",
   metadataAbsolutePath: "/tmp/bundle/extraction-metadata.json"
@@ -51,6 +56,7 @@ describe("buildAttachmentPromptPrefix", () => {
     expect(prefix).toContain("Attached ZIP for review:");
     expect(prefix).toContain("Original ZIP: .codex-web/attachments/zips/bundle.zip");
     expect(prefix).toContain("Extracted folder: .codex-web/attachments/extracted/bundle/");
+    expect(prefix).toContain("Extracted file count: 3");
     expect(prefix).toContain("Please inspect the extracted folder as part of the task.");
   });
 });

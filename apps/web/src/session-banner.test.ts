@@ -33,6 +33,35 @@ describe("session banner state", () => {
     });
   });
 
+  it("shows waiting states for prompt submission and terminal approvals", () => {
+    const waitingForCodex = reduceSessionBanner(createInitialSessionBanner(), { type: "prompt-submitted" });
+    const waitingForApproval = reduceSessionBanner(waitingForCodex, { type: "waiting-for-approval" });
+
+    expect(waitingForCodex).toEqual({
+      state: "waiting",
+      title: "Waiting for Codex",
+      detail: "Prompt sent. Codex should start responding without any extra terminal input."
+    });
+    expect(waitingForApproval).toEqual({
+      state: "waiting",
+      title: "Waiting for approval",
+      detail: "Codex is asking for confirmation in the terminal. Press Enter to approve or Esc to cancel."
+    });
+  });
+
+  it("returns to a readable running state once codex activity resumes", () => {
+    const running = reduceSessionBanner(createInitialSessionBanner(), {
+      type: "activity-detected",
+      repoPath: "/workspace/project"
+    });
+
+    expect(running).toEqual({
+      state: "running",
+      title: "Codex is responding",
+      detail: "Codex is processing output in /workspace/project."
+    });
+  });
+
   it("moves from stopping to stopped when the process exits and ignores the follow-up inactive status", () => {
     const stopping = reduceSessionBanner(createInitialSessionBanner(), { type: "stop-requested" });
     const stopped = reduceSessionBanner(stopping, { type: "exit-received", exitCode: 0, signal: 15 });

@@ -154,8 +154,67 @@ describe("ZIP attachments", () => {
     expect(response.body.relativePath).toBe(".codex-web/attachments/zips/bundle.zip");
     expect(response.body.extractedFolderRelativePath).toContain(".codex-web/attachments/extracted/");
     expect(response.body.extractedFileCount).toBe(2);
+    expect(response.body.extractedFiles).toEqual(["notes.md", "data/info.json"]);
+    expect(response.body.treePreview).toContain("- notes.md");
     expect(fs.existsSync(path.join(response.body.extractedFolderAbsolutePath, "notes.md"))).toBe(true);
     expect(fs.existsSync(path.join(response.body.extractedFolderAbsolutePath, "data", "info.json"))).toBe(true);
+  });
+
+  it("extracts a typical JavaScript repository ZIP", async () => {
+    const repoPath = makeTempDir("codex-web-js-zip-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+    const zipBuffer = await createZipBuffer([
+      { name: "package.json", content: '{"name":"demo"}' },
+      { name: "src/index.ts", content: "export const ok = true;" },
+      { name: "src/App.tsx", content: "export function App() { return null; }" },
+      { name: "pnpm-lock.yaml", content: "lockfileVersion: 9" }
+    ]);
+
+    const response = await uploadBuffer(repoPath, zipBuffer, "js-repo.zip", "application/zip");
+
+    expect(response.status).toBe(200);
+    expect(response.body.extractedFileCount).toBe(4);
+    expect(response.body.extractedFiles).toContain("package.json");
+    expect(response.body.extractedFiles).toContain("src/index.ts");
+    expect(response.body.extractedFiles).toContain("src/App.tsx");
+    expect(response.body.extractedFiles).toContain("pnpm-lock.yaml");
+  });
+
+  it("extracts a typical Python project ZIP", async () => {
+    const repoPath = makeTempDir("codex-web-py-zip-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+    const zipBuffer = await createZipBuffer([
+      { name: "pyproject.toml", content: "[project]\nname='demo'" },
+      { name: "requirements.txt", content: "fastapi\nuvicorn" },
+      { name: "app/main.py", content: "print('ok')" }
+    ]);
+
+    const response = await uploadBuffer(repoPath, zipBuffer, "python-repo.zip", "application/zip");
+
+    expect(response.status).toBe(200);
+    expect(response.body.extractedFileCount).toBe(3);
+    expect(response.body.extractedFiles).toContain("pyproject.toml");
+    expect(response.body.extractedFiles).toContain("requirements.txt");
+    expect(response.body.extractedFiles).toContain("app/main.py");
+  });
+
+  it("extracts a mixed-language repository ZIP with project files", async () => {
+    const repoPath = makeTempDir("codex-web-mixed-zip-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+    const zipBuffer = await createZipBuffer([
+      { name: "src/service.go", content: "package main" },
+      { name: "scripts/build.ps1", content: "Write-Host ok" },
+      { name: "backend/Program.cs", content: "class Program {}" },
+      { name: "backend/demo.csproj", content: "<Project />" },
+      { name: "Dockerfile", content: "FROM node:20" }
+    ]);
+
+    const response = await uploadBuffer(repoPath, zipBuffer, "mixed.zip", "application/zip");
+
+    expect(response.status).toBe(200);
+    expect(response.body.extractedFileCount).toBe(5);
+    expect(response.body.extractedFiles).toContain("backend/demo.csproj");
+    expect(response.body.extractedFiles).toContain("Dockerfile");
   });
 
   it("supports nested folders inside ZIPs", async () => {
@@ -185,6 +244,7 @@ describe("ZIP attachments", () => {
     expect(response.body.extractedFileCount).toBe(1);
     expect(response.body.skippedFileCount).toBe(1);
     expect(response.body.skippedFiles).toContain("bin/run.exe");
+    expect(response.body.skippedReasonCounts["unsupported-type"]).toBe(1);
   });
 
   it("creates extraction metadata", async () => {
@@ -199,9 +259,31 @@ describe("ZIP attachments", () => {
     const metadata = JSON.parse(fs.readFileSync(response.body.metadataAbsolutePath, "utf8")) as {
       originalFileName: string;
       extractedFileCount: number;
+      treePreview: string[];
+      skippedReasonCounts: Record<string, number>;
     };
     expect(metadata.originalFileName).toBe("meta.zip");
     expect(metadata.extractedFileCount).toBe(1);
+    expect(metadata.treePreview).toContain("- notes.md");
+    expect(metadata.skippedReasonCounts).toEqual({});
+  });
+
+  it("includes lock files and config files used for repository analysis", async () => {
+    const repoPath = makeTempDir("codex-web-lock-config-zip-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+    const zipBuffer = await createZipBuffer([
+      { name: "package-lock.json", content: '{"lockfileVersion":3}' },
+      { name: "Cargo.toml", content: "[package]\nname='demo'" },
+      { name: "build.gradle.kts", content: "plugins {}" },
+      { name: "config/app.properties", content: "mode=dev" }
+    ]);
+
+    const response = await uploadBuffer(repoPath, zipBuffer, "config.zip", "application/zip");
+
+    expect(response.status).toBe(200);
+    expect(response.body.extractedFiles).toEqual(
+      expect.arrayContaining(["package-lock.json", "Cargo.toml", "build.gradle.kts", "config/app.properties"])
+    );
   });
 
   it("rejects ZIPs with too many extractable files", async () => {
@@ -247,6 +329,33 @@ describe("ZIP attachments", () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error).toContain("25MB");
+  });
+
+  it("rejects ZIPs containing symlink entries", async () => {
+    const repoPath = makeTempDir("codex-web-zip-symlink-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+    const zipBuffer = await createZipBuffer([{ name: "link.sh", content: "README.md", mode: 0o120777 }]);
+
+    const response = await uploadBuffer(repoPath, zipBuffer, "symlink.zip", "application/zip");
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("symlink");
+  });
+
+  it("handles a large but legitimate source repository ZIP within limits", async () => {
+    const repoPath = makeTempDir("codex-web-large-legit-zip-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+    const entries = Array.from({ length: 250 }, (_, index) => ({
+      name: `src/module-${index}.ts`,
+      content: `export const value${index} = ${index};`
+    }));
+    const zipBuffer = await createZipBuffer(entries);
+
+    const response = await uploadBuffer(repoPath, zipBuffer, "large-legit.zip", "application/zip");
+
+    expect(response.status).toBe(200);
+    expect(response.body.extractedFileCount).toBe(250);
+    expect(response.body.treePreview[0]).toContain("module-0.ts");
   });
 });
 

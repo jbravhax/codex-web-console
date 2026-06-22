@@ -1,4 +1,4 @@
-export type SessionBannerState = "idle" | "connecting" | "running" | "stopping" | "stopped" | "failed";
+export type SessionBannerState = "idle" | "connecting" | "running" | "waiting" | "stopping" | "stopped" | "failed";
 
 export type SessionBanner = {
   state: SessionBannerState;
@@ -10,7 +10,10 @@ type SessionBannerEvent =
   | { type: "websocket-connecting" }
   | { type: "websocket-open" }
   | { type: "start-requested"; repoPath: string }
+  | { type: "prompt-submitted" }
   | { type: "status-received"; active: boolean; repoPath: string | null }
+  | { type: "waiting-for-approval" }
+  | { type: "activity-detected"; repoPath: string | null }
   | { type: "stop-requested" }
   | { type: "exit-received"; exitCode: number; signal: number }
   | { type: "websocket-close"; detail: string }
@@ -49,6 +52,14 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
     };
   }
 
+  if (event.type === "prompt-submitted") {
+    return {
+      state: "waiting",
+      title: "Waiting for Codex",
+      detail: "Prompt sent. Codex should start responding without any extra terminal input."
+    };
+  }
+
   if (event.type === "status-received") {
     if (event.active) {
       return {
@@ -66,6 +77,22 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
       state: "idle",
       title: "Idle",
       detail: "Connected. Ready to start a Codex session."
+    };
+  }
+
+  if (event.type === "waiting-for-approval") {
+    return {
+      state: "waiting",
+      title: "Waiting for approval",
+      detail: "Codex is asking for confirmation in the terminal. Press Enter to approve or Esc to cancel."
+    };
+  }
+
+  if (event.type === "activity-detected") {
+    return {
+      state: "running",
+      title: "Codex is responding",
+      detail: `Codex is processing output in ${formatRepoTarget(event.repoPath)}.`
     };
   }
 

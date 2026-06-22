@@ -21,12 +21,14 @@ describe("prompt context helpers", () => {
   it("builds the ZIP review block", () => {
     const block = buildZipPromptBlock(
       ".codex-web/attachments/zips/bundle.zip",
-      ".codex-web/attachments/extracted/bundle"
+      ".codex-web/attachments/extracted/bundle",
+      3
     );
 
     expect(block).toContain("Attached ZIP for review:");
     expect(block).toContain("Original ZIP: .codex-web/attachments/zips/bundle.zip");
     expect(block).toContain("Extracted folder: .codex-web/attachments/extracted/bundle/");
+    expect(block).toContain("Extracted file count: 3");
   });
 
   it("builds saved document instructions", () => {

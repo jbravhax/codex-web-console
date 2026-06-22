@@ -8,6 +8,29 @@ import type {
   RepoInsightsPanelProps,
   SessionHistoryPanelProps
 } from "./app-types";
+import type { PendingContextItem } from "./pending-context-types";
+
+type PendingContextGroup = {
+  key: PendingContextItem["kind"];
+  label: string;
+  items: PendingContextItem[];
+};
+
+function groupPendingContextItems(items: PendingContextItem[]): PendingContextGroup[] {
+  const groups: Array<{ key: PendingContextItem["kind"]; label: string }> = [
+    { key: "generated-document", label: "Large pasted documents" },
+    { key: "file", label: "Uploaded files" },
+    { key: "image", label: "Pasted images" },
+    { key: "zip", label: "ZIP uploads" }
+  ];
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: items.filter((item) => item.kind === group.key)
+    }))
+    .filter((group) => group.items.length > 0);
+}
 
 export function ConsoleHeader({ activeView, onChangeView, sessionBanner }: ConsoleHeaderProps) {
   return (
@@ -85,7 +108,9 @@ export function ProjectControls({
           Choose repo
         </button>
       </div>
-      <p className="helper-text">You can paste a path or choose a local folder if your browser supports it.</p>
+      <p className="helper-text">
+        Enter a specific project folder here, not a parent directory that contains many projects.
+      </p>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
       <div className="control-actions">
         <button type="button" onClick={onStartSession} disabled={status.active || !repoPath.trim()}>
@@ -146,6 +171,8 @@ export function PendingContextPanel({
   onCopyRelativePath,
   onRemoveAttachment
 }: PendingContextPanelProps) {
+  const groupedItems = groupPendingContextItems(pendingContextItems);
+
   return (
     <section className="rail-card context-card">
       <div className="section-heading">
@@ -166,73 +193,102 @@ export function PendingContextPanel({
       </p>
       {pendingContextItems.length === 0 ? (
         <p className="empty-context">
-          Paste text, drop files, or upload context for Codex. Larger pasted text becomes a local markdown file
-          automatically.
+          Nothing is queued yet. Large pasted text becomes a local markdown file reference, and attachments stay local
+          inside the active repo.
         </p>
       ) : (
-        <div className="attachment-list">
-          {pendingContextItems.map((item) => (
-            <article
-              className={`attachment-chip ${item.warningText ? "warning" : ""} ${
-                item.uploadState === "uploading" ? "uploading" : ""
-              }`}
-              key={item.id}
-            >
-              <div className="attachment-main">
-                <div className="attachment-title-row">
-                  <strong className="attachment-title">
-                    <span className="attachment-icon" aria-hidden="true">
-                      {item.icon}
-                    </span>
-                    {item.name}
-                  </strong>
-                  <div className="attachment-badges compact">
-                    <span className="attachment-badge">{item.typeLabel}</span>
-                    <span className={`attachment-badge ${item.uploadState === "ready" ? "ready" : "uploading"}`}>
-                      {item.uploadState === "ready" ? "Ready" : "Uploading"}
-                    </span>
-                  </div>
-                </div>
-                <div className="attachment-meta-line">
-                  <span>
-                    {item.kind === "generated-document"
-                      ? `${item.sizeBytes.toLocaleString()} characters`
-                      : formatAttachmentSize(item.sizeBytes)}
-                  </span>
-                  {item.warningText ? <span className="attachment-inline-warning">Skipped files inside ZIP</span> : null}
-                </div>
-                <span className="attachment-path">{item.relativePath || item.detailLine}</span>
-                {item.relativePath ? <span className="attachment-detail">{item.detailLine}</span> : null}
-                {item.uploadState === "uploading" && item.progressPercent !== null ? (
-                  <div className="progress-group">
-                    <span className="progress-text">Uploading... {item.progressPercent}%</span>
-                    <div className="progress-bar" aria-hidden="true">
-                      <div className="progress-bar-fill" style={{ width: `${item.progressPercent}%` }} />
+        <div className="attachment-groups">
+          {groupedItems.map((group) => (
+            <section className="attachment-group" key={group.key}>
+              <div className="attachment-group-header">
+                <strong>{group.label}</strong>
+                <span className="section-chip">{group.items.length}</span>
+              </div>
+              <div className="attachment-list">
+                {group.items.map((item) => (
+                  <article
+                    className={`attachment-chip ${item.warningText ? "warning" : ""} ${
+                      item.uploadState === "uploading" ? "uploading" : ""
+                    }`}
+                    key={item.id}
+                  >
+                    <div className="attachment-main">
+                      <div className="attachment-title-row">
+                        <strong className="attachment-title">
+                          <span className="attachment-icon" aria-hidden="true">
+                            {item.icon}
+                          </span>
+                          {item.name}
+                        </strong>
+                        <div className="attachment-badges compact">
+                          <span className="attachment-badge">{item.typeLabel}</span>
+                          <span className={`attachment-badge ${item.uploadState === "ready" ? "ready" : "uploading"}`}>
+                            {item.uploadState === "ready" ? "Ready" : "Uploading"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="attachment-meta-line">
+                        <span>
+                          {item.kind === "generated-document"
+                            ? `${item.sizeBytes.toLocaleString()} characters`
+                            : formatAttachmentSize(item.sizeBytes)}
+                        </span>
+                        {item.warningText ? <span className="attachment-inline-warning">Skipped files inside ZIP</span> : null}
+                      </div>
+                      <span className="attachment-path">{item.relativePath || item.detailLine}</span>
+                      {item.relativePath ? <span className="attachment-detail">{item.detailLine}</span> : null}
+                      {item.kind === "zip" && item.extractedFolderRelativePath ? (
+                        <div className="zip-summary">
+                          <span className="attachment-detail">Extracted folder: {item.extractedFolderRelativePath}/</span>
+                          {item.skippedReasonCounts && Object.keys(item.skippedReasonCounts).length > 0 ? (
+                            <span className="attachment-detail">
+                              Skipped reasons:{" "}
+                              {Object.entries(item.skippedReasonCounts)
+                                .map(([reason, count]) => `${count} ${reason}`)
+                                .join(", ")}
+                            </span>
+                          ) : null}
+                          {item.treePreview && item.treePreview.length > 0 ? (
+                            <details className="zip-tree-preview">
+                              <summary>Preview extracted tree</summary>
+                              <pre>{item.treePreview.join("\n")}</pre>
+                            </details>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {item.uploadState === "uploading" && item.progressPercent !== null ? (
+                        <div className="progress-group">
+                          <span className="progress-text">Uploading... {item.progressPercent}%</span>
+                          <div className="progress-bar" aria-hidden="true">
+                            <div className="progress-bar-fill" style={{ width: `${item.progressPercent}%` }} />
+                          </div>
+                        </div>
+                      ) : null}
+                      {item.warningText ? <span className="warning-text">Warning: {item.warningText}</span> : null}
                     </div>
-                  </div>
-                ) : null}
-                {item.warningText ? <span className="warning-text">Warning: {item.warningText}</span> : null}
+                    <div className="attachment-buttons">
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => {
+                          onCopyRelativePath(item.relativePath);
+                        }}
+                        disabled={!item.relativePath || item.uploadState !== "ready"}
+                      >
+                        Copy path
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost destructive-text"
+                        onClick={() => onRemoveAttachment(item.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </article>
+                ))}
               </div>
-              <div className="attachment-buttons">
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => {
-                    onCopyRelativePath(item.relativePath);
-                  }}
-                  disabled={!item.relativePath || item.uploadState !== "ready"}
-                >
-                  Copy path
-                </button>
-                <button
-                  type="button"
-                  className="ghost destructive-text"
-                  onClick={() => onRemoveAttachment(item.id)}
-                >
-                  Remove
-                </button>
-              </div>
-            </article>
+            </section>
           ))}
         </div>
       )}
@@ -288,7 +344,7 @@ export function ComposerPanel({
           <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={!status.active}>
             Attach files
           </button>
-          <span className="helper-text">Drag files here or paste an image directly into the prompt box.</span>
+          <span className="helper-text">Drop files here, use the picker, or paste an image directly into the prompt box.</span>
         </div>
       </div>
       <input
@@ -320,12 +376,12 @@ export function ComposerPanel({
       <div className="prompt-preview-panel">
         <div className="prompt-preview-header">
           <div>
-            <strong>Review before sending</strong>
-            <p className="helper-text">This preview uses the same generated prompt that will be sent to Codex.</p>
+            <strong>What Codex will receive</strong>
+            <p className="helper-text">This is the exact generated prompt that will be sent, including saved context references.</p>
           </div>
           <div className="prompt-preview-actions">
             <button type="button" className="ghost" onClick={onTogglePromptPreview}>
-              {isPromptPreviewExpanded ? "Hide details" : "Show details"}
+              {isPromptPreviewExpanded ? "Hide preview" : "Show preview"}
             </button>
             <button
               type="button"
@@ -340,17 +396,24 @@ export function ComposerPanel({
         <p className="prompt-preview-summary">{promptPreviewSummary}</p>
         {isPromptPreviewExpanded ? (
           <div className="prompt-preview-body">
-            <div className="prompt-preview-sections">
-              {promptPreviewSections.map((section) => (
-                <article className="prompt-preview-section" key={section.label}>
-                  <strong>{section.label}</strong>
-                  <pre>{section.lines.join("\n")}</pre>
-                </article>
-              ))}
-            </div>
+            {promptPreviewSections.length > 0 ? (
+              <div className="prompt-preview-sections">
+                {promptPreviewSections.map((section) => (
+                  <article className="prompt-preview-section" key={section.label}>
+                    <strong>{section.label}</strong>
+                    <pre>{section.lines.join("\n")}</pre>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="prompt-preview-empty-state">
+                <strong>Nothing queued yet</strong>
+                <p>Add a typed prompt, pasted document, file, image, or ZIP to see the exact message before sending it.</p>
+              </div>
+            )}
             <article className="prompt-preview-section prompt-preview-full">
               <strong>Full generated prompt</strong>
-              <pre>{generatedPromptPreview || "Nothing will be sent yet."}</pre>
+              <pre>{generatedPromptPreview || "Nothing will be sent yet. Add a prompt or context to build the final message."}</pre>
             </article>
           </div>
         ) : null}
@@ -502,6 +565,9 @@ export function SessionHistoryPanel({
               </button>
             </div>
           </div>
+          <p className="transcript-helper-text">
+            Cleaned transcript output preserves the readable session flow while removing terminal control noise.
+          </p>
           {transcriptViewer.isLoading ? <p className="history-empty">Loading transcript...</p> : null}
           {!transcriptViewer.isLoading && transcriptViewer.error ? <p className="history-empty">{transcriptViewer.error}</p> : null}
           {!transcriptViewer.isLoading && !transcriptViewer.error ? (

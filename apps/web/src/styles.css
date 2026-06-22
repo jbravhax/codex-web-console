@@ -226,12 +226,15 @@ textarea {
 }
 
 .session-banner-connecting,
+.session-banner-waiting,
 .session-banner-stopping {
   border-color: #f59e0b;
 }
 
 .session-banner-connecting .session-banner-state,
 .session-banner-connecting strong,
+.session-banner-waiting .session-banner-state,
+.session-banner-waiting strong,
 .session-banner-stopping .session-banner-state,
 .session-banner-stopping strong {
   color: #fbbf24;
@@ -404,6 +407,24 @@ textarea {
   gap: 0.75rem;
 }
 
+.prompt-preview-empty-state {
+  padding: 0.95rem 1rem;
+  border: 1px dashed var(--panel-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.prompt-preview-empty-state strong,
+.prompt-preview-empty-state p {
+  margin: 0;
+}
+
+.prompt-preview-empty-state p {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .prompt-preview-section {
   padding: 0.85rem 0.95rem;
   border: 1px solid var(--panel-border);
@@ -453,6 +474,28 @@ textarea {
   display: grid;
   gap: 0.65rem;
   margin-top: 1rem;
+}
+
+.attachment-groups {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.attachment-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.attachment-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.attachment-group-header strong {
+  font-size: 0.95rem;
 }
 
 .attachment-chip {
@@ -578,6 +621,35 @@ textarea {
 }
 
 .attachment-detail {
+  color: var(--muted);
+}
+
+.zip-summary {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.zip-tree-preview {
+  margin-top: 0.1rem;
+}
+
+.zip-tree-preview summary {
+  cursor: pointer;
+  color: var(--text);
+}
+
+.zip-tree-preview pre {
+  margin: 0.5rem 0 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 0.9rem/1.45 "IBM Plex Mono", monospace;
   color: var(--muted);
 }
 
@@ -789,17 +861,25 @@ textarea {
   margin: 0 0 0.5rem;
 }
 
+.transcript-helper-text {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .transcript-panel {
   margin: 1rem 0 0;
-  max-height: 420px;
+  max-height: 520px;
   overflow: auto;
-  padding: 1rem;
+  padding: 1rem 1.1rem;
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   background: var(--terminal-bg);
   white-space: pre-wrap;
   word-break: break-word;
-  font: 0.95rem/1.45 "IBM Plex Mono", monospace;
+  line-height: 1.55;
+  tab-size: 2;
+  font: 0.95rem/1.55 "IBM Plex Mono", monospace;
   color: var(--text);
 }
 

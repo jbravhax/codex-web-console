@@ -23,6 +23,10 @@ function inferAttachmentKind(attachment: PendingAttachment): PendingContextKind 
 
 function describeAttachment(attachment: PendingAttachment): Omit<PendingContextItem, "uploadState" | "progressPercent"> {
   if (attachment.kind === "zip") {
+    const skipSummary = Object.entries(attachment.skippedReasonCounts)
+      .map(([reason, count]) => `${count} ${reason}`)
+      .join(", ");
+
     return {
       id: attachment.attachmentId,
       kind: "zip",
@@ -33,10 +37,21 @@ function describeAttachment(attachment: PendingAttachment): Omit<PendingContextI
       relativePath: attachment.relativePath,
       absolutePath: attachment.absolutePath,
       extractedFolderRelativePath: attachment.extractedFolderRelativePath,
-      detailLine: `${attachment.extractedFileCount} extracted, ${attachment.skippedFileCount} skipped`,
+      extractedFileCount: attachment.extractedFileCount,
+      skippedReasonCounts: attachment.skippedReasonCounts,
+      treePreview: attachment.treePreview,
+      detailLine: `${attachment.extractedFileCount} extracted, ${attachment.skippedFileCount} skipped, ${attachment.totalExtractedBytes.toLocaleString()} bytes`,
       warningText:
-        attachment.skippedFileCount > 0 ? "Some ZIP entries were skipped because they are unsupported." : undefined,
-      promptLines: [buildZipPromptBlock(attachment.relativePath, attachment.extractedFolderRelativePath)]
+        attachment.skippedFileCount > 0
+          ? `Some ZIP entries were skipped. ${skipSummary || "See extraction summary for details."}`
+          : undefined,
+      promptLines: [
+        buildZipPromptBlock(
+          attachment.relativePath,
+          attachment.extractedFolderRelativePath,
+          attachment.extractedFileCount
+        )
+      ]
     };
   }
 
@@ -131,7 +146,9 @@ export function buildPendingContextPreview(items: PendingContextItem[]): string[
 
   for (const item of readyItems) {
     if (item.kind === "zip") {
-      previewLines.push(`ZIP review: ${item.relativePath}`);
+      previewLines.push(
+        `ZIP review: ${item.relativePath} (${item.extractedFileCount ?? 0} extracted, ${item.warningText ? "with skipped files" : "complete"})`
+      );
       continue;
     }
 
@@ -189,6 +206,10 @@ export function buildPromptPreviewSections(prompt: string, items: PendingContext
   const pastedImages = readyItems.filter((item) => item.kind === "image");
   const zipItems = readyItems.filter((item) => item.kind === "zip");
 
+  if (!userPrompt && readyItems.length === 0) {
+    return [];
+  }
+
   sections.push({
     label: "User prompt text",
     lines: userPrompt ? [userPrompt] : ["No typed prompt yet."]
@@ -223,6 +244,13 @@ export function buildPromptPreviewSections(prompt: string, items: PendingContext
     sections.push({
       label: "ZIP extracted folder paths",
       lines: zipItems.map((item) => `${item.extractedFolderRelativePath ?? ""}/`)
+    });
+    sections.push({
+      label: "ZIP extraction summary",
+      lines: zipItems.map(
+        (item) =>
+          `${item.name}: ${(item.extractedFileCount ?? 0).toLocaleString()} extracted, ${item.warningText ?? "no skipped files"}`
+      )
     });
   }
 
