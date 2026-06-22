@@ -36,7 +36,7 @@ function groupPendingContextItems(items: PendingContextItem[]): PendingContextGr
 function formatZipSkipReason(reason: string): string {
   switch (reason) {
     case "unsupported-type":
-      return "unsupported file types";
+      return "unsupported or non-review file types";
     default:
       return reason.replace(/-/g, " ");
   }

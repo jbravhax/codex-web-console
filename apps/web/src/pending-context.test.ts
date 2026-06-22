@@ -113,7 +113,7 @@ describe("pending context model", () => {
 
     expect(previewLines).toContain("Attached file: .codex-web/attachments/files/notes.md");
     expect(previewLines).toContain(
-      "ZIP review: .codex-web/attachments/zips/bundle.zip (3 extracted, with skipped files)"
+      "ZIP review: .codex-web/attachments/zips/bundle.zip (3 reviewable files extracted, with skipped files)"
     );
     expect(previewLines).toContain("Saved pasted context: .codex-web/documents/pasted-20260621-120000.md");
   });
@@ -184,7 +184,9 @@ describe("pending context model", () => {
       },
       {
         label: "ZIP extraction summary",
-        lines: ["bundle.zip: 3 extracted, Some ZIP entries were skipped for safety or compatibility. 1 unsupported file types"]
+        lines: [
+          "bundle.zip: 3 reviewable files extracted, Some ZIP entries were skipped because they are not reviewable here or would be unsafe to extract. 1 unsupported or non-review file types"
+        ]
       }
     ]);
   });

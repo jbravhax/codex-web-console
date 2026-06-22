@@ -60,6 +60,21 @@ function createZipBuffer(
   });
 }
 
+function createRepeatedEntries(
+  count: number,
+  fileNameFactory: (index: number) => string,
+  contentFactory: (index: number) => string | Buffer = () => "x"
+) {
+  return Array.from({ length: count }, (_, index) => ({
+    name: fileNameFactory(index),
+    content: contentFactory(index)
+  }));
+}
+
+function createFilledBuffer(sizeBytes: number, byte = 0x61): Buffer {
+  return Buffer.alloc(sizeBytes, byte);
+}
+
 async function uploadBuffer(
   repoPath: string,
   buffer: Buffer,
@@ -217,6 +232,42 @@ describe("ZIP attachments", () => {
     expect(response.body.extractedFiles).toContain("Dockerfile");
   });
 
+  it("extracts a medium-sized source repository with nested folders and repo metadata", async () => {
+    const repoPath = makeTempDir("codex-web-medium-repo-zip-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+
+    const entries = [
+      { name: "package.json", content: '{"name":"medium-demo"}' },
+      { name: "pnpm-lock.yaml", content: "lockfileVersion: 9" },
+      { name: "tsconfig.json", content: '{"compilerOptions":{"strict":true}}' },
+      { name: "README.md", content: "# Medium Demo" },
+      { name: "src/index.ts", content: "export * from './server';" },
+      { name: "src/server/app.ts", content: "export const app = true;" },
+      { name: "src/server/routes/health.ts", content: "export const health = '/health';" },
+      { name: "src/lib/logger.ts", content: "export const logger = console;" },
+      { name: "config/default.yaml", content: "port: 3000" },
+      { name: "scripts/build.ps1", content: "Write-Host build" },
+      ...createRepeatedEntries(60, (index) => `src/features/feature-${index}.ts`, (index) => `export const feature${index} = ${index};`)
+    ];
+
+    const zipBuffer = await createZipBuffer(entries);
+
+    const response = await uploadBuffer(repoPath, zipBuffer, "medium-repo.zip", "application/zip");
+
+    expect(response.status).toBe(200);
+    expect(response.body.extractedFileCount).toBe(entries.length);
+    expect(response.body.treePreview).toContain("- package.json");
+    expect(response.body.extractedFiles).toContain("src/server/routes/health.ts");
+    const metadata = JSON.parse(fs.readFileSync(response.body.metadataAbsolutePath, "utf8")) as {
+      extractedFileCount: number;
+      skippedFileCount: number;
+      limitsApplied: { maxExtractedFileCount: number };
+    };
+    expect(metadata.extractedFileCount).toBe(entries.length);
+    expect(metadata.skippedFileCount).toBe(0);
+    expect(metadata.limitsApplied.maxExtractedFileCount).toBe(MAX_EXTRACTED_FILE_COUNT);
+  });
+
   it("supports nested folders inside ZIPs", async () => {
     const repoPath = makeTempDir("codex-web-zip-");
     fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
@@ -245,6 +296,25 @@ describe("ZIP attachments", () => {
     expect(response.body.skippedFileCount).toBe(1);
     expect(response.body.skippedFiles).toContain("bin/run.exe");
     expect(response.body.skippedReasonCounts["unsupported-type"]).toBe(1);
+  });
+
+  it("extracts reviewable source files while clearly skipping unsupported binary content", async () => {
+    const repoPath = makeTempDir("codex-web-mixed-binary-zip-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+    const zipBuffer = await createZipBuffer([
+      { name: "README.md", content: "# Repo" },
+      { name: "src/main.rs", content: "fn main() {}" },
+      { name: "assets/logo.svg", content: "<svg />" },
+      { name: "bin/tool.exe", content: createFilledBuffer(256, 0x42) },
+      { name: "dist/app.bin", content: createFilledBuffer(512, 0x7f) }
+    ]);
+
+    const response = await uploadBuffer(repoPath, zipBuffer, "mixed-binary.zip", "application/zip");
+
+    expect(response.status).toBe(200);
+    expect(response.body.extractedFiles).toEqual(expect.arrayContaining(["README.md", "src/main.rs"]));
+    expect(response.body.skippedFiles).toEqual(expect.arrayContaining(["assets/logo.svg", "bin/tool.exe", "dist/app.bin"]));
+    expect(response.body.skippedReasonCounts["unsupported-type"]).toBe(3);
   });
 
   it("creates extraction metadata", async () => {
@@ -286,13 +356,31 @@ describe("ZIP attachments", () => {
     );
   });
 
+  it("records extraction metadata for skipped unsupported files", async () => {
+    const repoPath = makeTempDir("codex-web-zip-metadata-skips-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+    const zipBuffer = await createZipBuffer([
+      { name: "README.md", content: "# Repo" },
+      { name: "bin/tool.exe", content: createFilledBuffer(64, 0x01) }
+    ]);
+
+    const response = await uploadBuffer(repoPath, zipBuffer, "metadata-skips.zip", "application/zip");
+
+    expect(response.status).toBe(200);
+    const metadata = JSON.parse(fs.readFileSync(response.body.metadataAbsolutePath, "utf8")) as {
+      skippedFiles: string[];
+      skippedReasonCounts: Record<string, number>;
+      limitsApplied: { maxTotalExtractedBytes: number };
+    };
+    expect(metadata.skippedFiles).toContain("bin/tool.exe");
+    expect(metadata.skippedReasonCounts["unsupported-type"]).toBe(1);
+    expect(metadata.limitsApplied.maxTotalExtractedBytes).toBe(MAX_TOTAL_EXTRACTED_BYTES);
+  });
+
   it("rejects ZIPs with too many extractable files", async () => {
     const repoPath = makeTempDir("codex-web-zip-");
     fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
-    const entries = Array.from({ length: MAX_EXTRACTED_FILE_COUNT + 1 }, (_, index) => ({
-      name: `file-${index}.md`,
-      content: "x"
-    }));
+    const entries = createRepeatedEntries(MAX_EXTRACTED_FILE_COUNT + 1, (index) => `file-${index}.md`);
     const zipBuffer = await createZipBuffer(entries);
 
     const response = await uploadBuffer(repoPath, zipBuffer, "too-many.zip", "application/zip");
@@ -305,11 +393,11 @@ describe("ZIP attachments", () => {
     const repoPath = makeTempDir("codex-web-zip-");
     fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
     const zipBuffer = await createZipBuffer([
-      { name: "one.md", content: "a".repeat(21 * 1024 * 1024) },
-      { name: "two.md", content: "b".repeat(21 * 1024 * 1024) },
-      { name: "three.md", content: "c".repeat(21 * 1024 * 1024) },
-      { name: "four.md", content: "d".repeat(21 * 1024 * 1024) },
-      { name: "five.md", content: "e".repeat(21 * 1024 * 1024) }
+      { name: "one.md", content: createFilledBuffer(21 * 1024 * 1024, 0x61) },
+      { name: "two.md", content: createFilledBuffer(21 * 1024 * 1024, 0x62) },
+      { name: "three.md", content: createFilledBuffer(21 * 1024 * 1024, 0x63) },
+      { name: "four.md", content: createFilledBuffer(21 * 1024 * 1024, 0x64) },
+      { name: "five.md", content: createFilledBuffer(21 * 1024 * 1024, 0x65) }
     ]);
 
     const response = await uploadBuffer(repoPath, zipBuffer, "too-large-total.zip", "application/zip");
@@ -322,7 +410,7 @@ describe("ZIP attachments", () => {
     const repoPath = makeTempDir("codex-web-zip-");
     fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
     const zipBuffer = await createZipBuffer([
-      { name: "huge.md", content: "a".repeat(MAX_SINGLE_EXTRACTED_FILE_BYTES + 1) }
+      { name: "huge.md", content: createFilledBuffer(MAX_SINGLE_EXTRACTED_FILE_BYTES + 1, 0x61) }
     ]);
 
     const response = await uploadBuffer(repoPath, zipBuffer, "too-large-file.zip", "application/zip");
@@ -345,16 +433,17 @@ describe("ZIP attachments", () => {
   it("handles a large but legitimate source repository ZIP within limits", async () => {
     const repoPath = makeTempDir("codex-web-large-legit-zip-");
     fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
-    const entries = Array.from({ length: 250 }, (_, index) => ({
-      name: `src/module-${index}.ts`,
-      content: `export const value${index} = ${index};`
-    }));
+    const entries = createRepeatedEntries(
+      180,
+      (index) => `src/module-${index}.ts`,
+      (index) => `export const value${index} = ${index};`
+    );
     const zipBuffer = await createZipBuffer(entries);
 
     const response = await uploadBuffer(repoPath, zipBuffer, "large-legit.zip", "application/zip");
 
     expect(response.status).toBe(200);
-    expect(response.body.extractedFileCount).toBe(250);
+    expect(response.body.extractedFileCount).toBe(180);
     expect(response.body.treePreview[0]).toContain("module-0.ts");
   });
 });

@@ -13,10 +13,17 @@ export type PromptPreviewSection = {
 function formatZipSkipReason(reason: string): string {
   switch (reason) {
     case "unsupported-type":
-      return "unsupported file types";
+      return "unsupported or non-review file types";
     default:
       return reason.replace(/-/g, " ");
   }
+}
+
+function formatZipExtractedSummary(extractedFileCount: number, skippedFileCount: number, totalExtractedBytes: number): string {
+  const extractedLabel = `${extractedFileCount.toLocaleString()} reviewable file${extractedFileCount === 1 ? "" : "s"} extracted`;
+  const skippedLabel = `${skippedFileCount.toLocaleString()} skipped`;
+  const sizeLabel = `${totalExtractedBytes.toLocaleString()} bytes total`;
+  return `${extractedLabel}, ${skippedLabel}, ${sizeLabel}`;
 }
 
 function formatZipSkipSummary(skipReasonCounts: Record<string, number>): string {
@@ -54,10 +61,14 @@ function describeAttachment(attachment: PendingAttachment): Omit<PendingContextI
       extractedFileCount: attachment.extractedFileCount,
       skippedReasonCounts: attachment.skippedReasonCounts,
       treePreview: attachment.treePreview,
-      detailLine: `${attachment.extractedFileCount} extracted, ${attachment.skippedFileCount} skipped, ${attachment.totalExtractedBytes.toLocaleString()} bytes`,
+      detailLine: formatZipExtractedSummary(
+        attachment.extractedFileCount,
+        attachment.skippedFileCount,
+        attachment.totalExtractedBytes
+      ),
       warningText:
         attachment.skippedFileCount > 0
-          ? `Some ZIP entries were skipped for safety or compatibility. ${skipSummary || "See extraction summary for details."}`
+          ? `Some ZIP entries were skipped because they are not reviewable here or would be unsafe to extract. ${skipSummary || "See extraction summary for details."}`
           : undefined,
       promptLines: [
         buildZipPromptBlock(
@@ -161,7 +172,7 @@ export function buildPendingContextPreview(items: PendingContextItem[]): string[
   for (const item of readyItems) {
     if (item.kind === "zip") {
       previewLines.push(
-        `ZIP review: ${item.relativePath} (${item.extractedFileCount ?? 0} extracted, ${item.warningText ? "with skipped files" : "complete"})`
+        `ZIP review: ${item.relativePath} (${(item.extractedFileCount ?? 0).toLocaleString()} reviewable files extracted${item.warningText ? ", with skipped files" : ""})`
       );
       continue;
     }
@@ -263,7 +274,7 @@ export function buildPromptPreviewSections(prompt: string, items: PendingContext
       label: "ZIP extraction summary",
       lines: zipItems.map(
         (item) =>
-          `${item.name}: ${(item.extractedFileCount ?? 0).toLocaleString()} extracted, ${item.warningText ?? "no skipped files"}`
+          `${item.name}: ${(item.extractedFileCount ?? 0).toLocaleString()} reviewable files extracted, ${item.warningText ?? "no skipped files"}`
       )
     });
   }

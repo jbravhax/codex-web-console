@@ -73,7 +73,7 @@ describe("PendingContextPanel", () => {
           "Saved pasted context: .codex-web/documents/pasted-20260621-120000.md",
           "Attached file: .codex-web/attachments/files/notes.md",
           "Attached file: .codex-web/attachments/files/diagram.png",
-          "ZIP review: .codex-web/attachments/zips/bundle.zip (3 extracted, with skipped files)"
+          "ZIP review: .codex-web/attachments/zips/bundle.zip (3 reviewable files extracted, with skipped files)"
         ]}
         onClearAll={vi.fn()}
         onCopyRelativePath={vi.fn()}
@@ -86,8 +86,12 @@ describe("PendingContextPanel", () => {
     expect(screen.getByText("Pasted images")).toBeTruthy();
     expect(screen.getByText("ZIP uploads")).toBeTruthy();
     expect(screen.getByText("Extracted folder: .codex-web/attachments/extracted/bundle/")).toBeTruthy();
-    expect(screen.getByText("Warning: Some ZIP entries were skipped for safety or compatibility. 2 unsupported file types")).toBeTruthy();
-    expect(screen.getByText("Skipped reasons: 2 unsupported file types")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Warning: Some ZIP entries were skipped because they are not reviewable here or would be unsafe to extract. 2 unsupported or non-review file types"
+      )
+    ).toBeTruthy();
+    expect(screen.getByText("Skipped reasons: 2 unsupported or non-review file types")).toBeTruthy();
   });
 
   it("fires clear-all from the grouped context panel", () => {

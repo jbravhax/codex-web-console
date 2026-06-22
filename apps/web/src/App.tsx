@@ -594,10 +594,10 @@ export function App() {
       if (attachment.kind === "zip") {
         const skippedSummary =
           attachment.skippedFileCount > 0
-            ? ` ${attachment.skippedFileCount.toLocaleString()} file${attachment.skippedFileCount === 1 ? " was" : "s were"} skipped.`
+            ? ` ${attachment.skippedFileCount.toLocaleString()} file${attachment.skippedFileCount === 1 ? " was" : "s were"} skipped because ${attachment.skippedFileCount === 1 ? "it was" : "they were"} not reviewable here or would have been unsafe to extract.`
             : "";
         setContextMessage(
-          `Uploaded ${attachment.fileName} and extracted ${attachment.extractedFileCount.toLocaleString()} reviewable file${attachment.extractedFileCount === 1 ? "" : "s"} to ${attachment.extractedFolderRelativePath}/.${skippedSummary}`
+          `Uploaded ${attachment.fileName} and extracted ${attachment.extractedFileCount.toLocaleString()} reviewable file${attachment.extractedFileCount === 1 ? "" : "s"} into ${attachment.extractedFolderRelativePath}/ for Codex to inspect.${skippedSummary}`
         );
       } else {
         setContextMessage(`Added ${attachment.relativePath} to the next prompt.`);
