@@ -1,24 +1,32 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import {
-  createPastedImageFileName,
-  formatAttachmentSize,
-  isSupportedAttachmentName
-} from "./attachments";
+import { createPastedImageFileName, isSupportedAttachmentName } from "./attachments";
 import type { PendingAttachment } from "./attachment-types";
+import type {
+  AppSettings,
+  DiffViewerState,
+  GitStatusSummary,
+  RecentProjectItem,
+  ServerMessage,
+  SessionHistoryItem,
+  SessionStatus,
+  ThemeSetting,
+  TranscriptViewerState
+} from "./app-types";
+import { ConsoleHeader, ConsoleView } from "./console-panels";
 import {
   buildGitDiffEmptyState,
   buildGitDiffPanelText,
   copyGitDiffText,
-  loadGitDiff,
-  type GitDiffSummary
+  loadGitDiff
 } from "./git-diff-viewer";
 import {
   buildDocumentReference,
   classifyPaste,
   type SavedPromptDocument
 } from "./prompt-documents";
+import { chooseRepoDirectory } from "./repo-picker";
 import {
   appendGeneratedDocumentItem,
   appendPendingContextItem,
@@ -41,65 +49,6 @@ import { createInitialSessionBanner, reduceSessionBanner, type SessionBanner } f
 import { buildSessionWebSocketUrl } from "./session-connection";
 import { copyTranscriptText, loadSessionTranscript } from "./session-transcripts";
 import { friendlyUploadErrorMessage } from "./ui-messages";
-
-type ThemeSetting = "light" | "dark";
-
-type SessionStatus = {
-  active: boolean;
-  repoPath: string | null;
-};
-
-type SessionHistoryItem = {
-  id: string;
-  repoPath: string;
-  startTime: string;
-  endTime: string | null;
-  durationMs: number | null;
-};
-
-type TranscriptViewerState = {
-  session: SessionHistoryItem | null;
-  transcript: string;
-  isLoading: boolean;
-  error: string;
-};
-
-type DiffViewerState = {
-  diff: GitDiffSummary | null;
-  isLoading: boolean;
-  error: string;
-};
-
-type RecentProjectItem = {
-  repoPath: string;
-  lastOpenedAt: string;
-  openCount: number;
-  available: boolean;
-};
-
-type AppSettings = {
-  codexExecutablePath: string;
-  defaultRepoRoot: string;
-  serverBindHost: string;
-  serverPort: number;
-  theme: ThemeSetting;
-};
-
-type GitStatusSummary = {
-  repoPath: string;
-  isGitRepo: boolean;
-  branch: string | null;
-  changedFilesCount: number;
-  stagedFilesCount: number;
-  untrackedFilesCount: number;
-  message?: string;
-};
-
-type ServerMessage =
-  | { type: "status"; payload: SessionStatus }
-  | { type: "output"; payload: string }
-  | { type: "exit"; payload: { exitCode: number; signal: number } }
-  | { type: "error"; payload: string };
 
 const DEFAULT_SETTINGS: AppSettings = {
   codexExecutablePath: "codex",
@@ -159,6 +108,7 @@ export function App() {
   const [error, setError] = useState("");
   const [settingsMessage, setSettingsMessage] = useState("");
   const [contextMessage, setContextMessage] = useState("");
+  const [repoPickerMessage, setRepoPickerMessage] = useState("");
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(true);
@@ -700,6 +650,32 @@ export function App() {
     }
   };
 
+  const handleChooseRepo = async () => {
+    setError("");
+    setRepoPickerMessage("");
+
+    try {
+      const result = await chooseRepoDirectory();
+
+      if (result.kind === "selected") {
+        setRepoPath(result.repoPath);
+        setRepoPickerMessage(`Selected ${result.repoPath}.`);
+        return;
+      }
+
+      if (result.kind === "unsupported" || result.kind === "missing-path") {
+        setRepoPickerMessage(result.message);
+        return;
+      }
+
+      if (result.kind === "cancelled") {
+        setRepoPickerMessage("Folder selection was canceled. Paste the repo path manually or try again.");
+      }
+    } catch {
+      setError("Could not open the folder picker. Paste the repo path manually.");
+    }
+  };
+
   const removeAttachment = (attachmentId: string) => {
     setPendingContextItems((current) => removePendingContextById(current, attachmentId));
   };
@@ -845,505 +821,84 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <header className="page-header">
-        <div className="page-header-copy">
-          <p className="eyebrow">Local only</p>
-          <h1>Codex CLI Web Console</h1>
-          <p className="page-header-subtitle">A calm browser workspace for the Codex CLI running on this machine.</p>
-        </div>
-        <div className="header-actions">
-          <div className="tab-row">
-            <button
-              type="button"
-              className={activeView === "console" ? "tab-button active" : "tab-button secondary"}
-              onClick={() => setActiveView("console")}
-            >
-              Console
-            </button>
-            <button
-              type="button"
-              className={activeView === "settings" ? "tab-button active" : "tab-button secondary"}
-              onClick={() => setActiveView("settings")}
-            >
-              Settings
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <section className={`session-banner session-banner-${sessionBanner.state}`} aria-live="polite">
-        <div className="session-banner-copy">
-          <strong>{sessionBanner.title}</strong>
-          <p>{sessionBanner.detail}</p>
-        </div>
-        <span className="session-banner-state">{sessionBanner.state}</span>
-      </section>
+      <ConsoleHeader activeView={activeView} onChangeView={setActiveView} sessionBanner={sessionBanner} />
 
       {activeView === "console" ? (
-        <>
-          <div className="console-layout">
-            <aside className="control-rail">
-              <section className="controls rail-card">
-                <div className="section-heading">
-                  <div>
-                    <p className="section-kicker">Workspace</p>
-                    <h2>Project</h2>
-                  </div>
-                  <span className="section-chip">{status.active ? "Active" : "Ready"}</span>
-                </div>
-                <label htmlFor="repo-path">Repo path</label>
-                <input
-                  id="repo-path"
-                  type="text"
-                  value={repoPath}
-                  onChange={(event) => setRepoPath(event.target.value)}
-                  placeholder={settings.defaultRepoRoot || "/home/you/project"}
-                />
-                <div className="control-actions">
-                  <button type="button" onClick={startSession} disabled={status.active || !repoPath.trim()}>
-                    Start session
-                  </button>
-                  <button type="button" onClick={stopSession} disabled={!status.active} className="destructive">
-                    Stop session
-                  </button>
-                </div>
-                <div className="meta-row">
-                  <div className="meta-pill">
-                    <span className="meta-label">Server</span>
-                    <strong>{formatConnectionState(connectionState)}</strong>
-                  </div>
-                  <div className="meta-pill">
-                    <span className="meta-label">Default repo root</span>
-                    <strong>{isLoadingSettings ? "Loading..." : settings.defaultRepoRoot || "Choose a folder"}</strong>
-                  </div>
-                </div>
-                <div className="recent-projects">
-                  <div className="recent-projects-header">
-                    <strong>Recent projects</strong>
-                    <span className="section-chip">{recentProjects.length}</span>
-                  </div>
-                  {isLoadingRecentProjects ? <p className="helper-text">Loading recent projects...</p> : null}
-                  {!isLoadingRecentProjects && recentProjects.length === 0 ? (
-                    <p className="helper-text">Open a project once and it will appear here for quick reuse.</p>
-                  ) : null}
-                  {recentProjects.length > 0 ? (
-                    <div className="recent-project-list">
-                      {recentProjects.map((project) => (
-                        <button
-                          key={project.repoPath}
-                          type="button"
-                          className={`recent-project-chip ${project.available ? "" : "unavailable"}`}
-                          onClick={() => setRepoPath(project.repoPath)}
-                          disabled={!project.available}
-                        >
-                          <span className="recent-project-path">{project.repoPath}</span>
-                          <span className="recent-project-meta">
-                            {project.available
-                              ? `${project.openCount} open${project.openCount === 1 ? "" : "s"}`
-                              : "Unavailable"}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </section>
-
-              <section className="rail-card context-card">
-                <div className="section-heading">
-                  <div>
-                    <p className="section-kicker">Context</p>
-                    <h2>Ready context</h2>
-                  </div>
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={clearAllPendingContext}
-                    disabled={pendingContextItems.length === 0}
-                  >
-                    Clear all
-                  </button>
-                </div>
-                <p className="pending-context-subtitle">
-                  {readyPendingItemCount > 0
-                    ? `${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"} will be included with the next prompt.`
-                    : pendingContextItems.length > 0
-                      ? "Context is still being prepared."
-                      : pendingContextEmptyState}
-                </p>
-                {pendingContextItems.length === 0 ? (
-                  <p className="empty-context">
-                    Paste text, drop files, or upload context for Codex. Larger pasted text becomes a local markdown
-                    file automatically.
-                  </p>
-                ) : (
-                  <div className="attachment-list">
-                    {pendingContextItems.map((item) => (
-                      <article
-                        className={`attachment-chip ${item.warningText ? "warning" : ""} ${
-                          item.uploadState === "uploading" ? "uploading" : ""
-                        }`}
-                        key={item.id}
-                      >
-                        <div className="attachment-main">
-                          <div className="attachment-title-row">
-                            <strong className="attachment-title">
-                              <span className="attachment-icon" aria-hidden="true">
-                                {item.icon}
-                              </span>
-                              {item.name}
-                            </strong>
-                            <div className="attachment-badges compact">
-                              <span className="attachment-badge">{item.typeLabel}</span>
-                              <span
-                                className={`attachment-badge ${
-                                  item.uploadState === "ready" ? "ready" : "uploading"
-                                }`}
-                              >
-                                {item.uploadState === "ready" ? "Ready" : "Uploading"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="attachment-meta-line">
-                            <span>
-                              {item.kind === "generated-document"
-                                ? `${item.sizeBytes.toLocaleString()} characters`
-                                : formatAttachmentSize(item.sizeBytes)}
-                            </span>
-                            {item.warningText ? (
-                              <span className="attachment-inline-warning">Skipped files inside ZIP</span>
-                            ) : null}
-                          </div>
-                          <span className="attachment-path">{item.relativePath || item.detailLine}</span>
-                          {item.relativePath ? <span className="attachment-detail">{item.detailLine}</span> : null}
-                          {item.uploadState === "uploading" && item.progressPercent !== null ? (
-                            <div className="progress-group">
-                              <span className="progress-text">Uploading... {item.progressPercent}%</span>
-                              <div className="progress-bar" aria-hidden="true">
-                                <div className="progress-bar-fill" style={{ width: `${item.progressPercent}%` }} />
-                              </div>
-                            </div>
-                          ) : null}
-                          {item.warningText ? <span className="warning-text">Warning: {item.warningText}</span> : null}
-                        </div>
-                        <div className="attachment-buttons">
-                          <button
-                            type="button"
-                            className="ghost"
-                            onClick={() => {
-                              void copyItemRelativePath(item.relativePath);
-                            }}
-                            disabled={!item.relativePath || item.uploadState !== "ready"}
-                          >
-                            Copy path
-                          </button>
-                          <button
-                            type="button"
-                            className="ghost destructive-text"
-                            onClick={() => removeAttachment(item.id)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-                {pendingContextPreviewLines.length > 0 ? (
-                  <div className="context-preview">
-                    <strong>Pending context summary</strong>
-                    <ul className="context-preview-list">
-                      {pendingContextPreviewLines.map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </section>
-            </aside>
-
-            <main className="workspace-main">
-              <section className="terminal-section workspace-card">
-                <div className="terminal-stage-header">
-                  <div>
-                    <p className="section-kicker">Console</p>
-                    <h2>Live Codex terminal</h2>
-                  </div>
-                  <div className="terminal-stage-meta">
-                    <span className="section-chip">{status.active ? "Interactive" : "Waiting"}</span>
-                  </div>
-                </div>
-                <div ref={terminalContainerRef} className="terminal-panel" />
-              </section>
-
-              <section
-                className="prompt-panel workspace-card composer-card"
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  void handleDrop(event);
-                }}
-              >
-                <div className="composer-header">
-                  <div>
-                    <p className="section-kicker">Prompt</p>
-                    <h2>Guide Codex intentionally</h2>
-                    <p className="helper-text">
-                      Write the task, attach supporting context, and review the final assembled prompt before sending
-                      it.
-                    </p>
-                  </div>
-                  <div className="attachment-actions">
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={!status.active}
-                    >
-                      Attach files
-                    </button>
-                    <span className="helper-text">Drag files here or paste an image directly into the prompt box.</span>
-                  </div>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  className="hidden-input"
-                  type="file"
-                  multiple
-                  accept=".txt,.md,.json,.csv,.log,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp,.pdf,.zip"
-                  onChange={(event) => {
-                    void handleFileSelection(event);
-                  }}
-                  disabled={!status.active}
-                />
-                <label htmlFor="prompt-input" className="composer-label">
-                  Prompt
-                </label>
-                <textarea
-                  id="prompt-input"
-                  ref={promptInputRef}
-                  value={promptText}
-                  onChange={(event) => setPromptText(event.target.value)}
-                  onPaste={(event) => {
-                    void handlePromptPaste(event);
-                  }}
-                  placeholder="Describe the task clearly. Large pasted text will be stored as a local markdown document instead of flooding the prompt."
-                  disabled={!status.active}
-                  className="prompt-textarea"
-                />
-                <div className="prompt-preview-panel">
-                  <div className="prompt-preview-header">
-                    <div>
-                      <strong>Review before sending</strong>
-                      <p className="helper-text">This preview uses the same generated prompt that will be sent to Codex.</p>
-                    </div>
-                    <div className="prompt-preview-actions">
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() => setIsPromptPreviewExpanded((current) => !current)}
-                      >
-                        {isPromptPreviewExpanded ? "Hide details" : "Show details"}
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => {
-                          void copyPromptPreview();
-                        }}
-                        disabled={!generatedPromptPreview.trim()}
-                      >
-                        Copy preview
-                      </button>
-                    </div>
-                  </div>
-                  <p className="prompt-preview-summary">{promptPreviewSummary}</p>
-                  {isPromptPreviewExpanded ? (
-                    <div className="prompt-preview-body">
-                      <div className="prompt-preview-sections">
-                        {promptPreviewSections.map((section) => (
-                          <article className="prompt-preview-section" key={section.label}>
-                            <strong>{section.label}</strong>
-                            <pre>{section.lines.join("\n")}</pre>
-                          </article>
-                        ))}
-                      </div>
-                      <article className="prompt-preview-section prompt-preview-full">
-                        <strong>Full generated prompt</strong>
-                        <pre>{generatedPromptPreview || "Nothing will be sent yet."}</pre>
-                      </article>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="prompt-actions">
-                  <button type="button" onClick={sendPrompt} disabled={!status.active}>
-                    Send prompt
-                  </button>
-                  <span className="helper-text">
-                    Pasted text under 10,000 characters stays inline. Larger pastes become local files automatically.
-                  </span>
-                </div>
-                {contextMessage ? <p className="success-banner">{contextMessage}</p> : null}
-              </section>
-            </main>
-
-            <aside className="insights-rail">
-              <section className="git-section rail-card">
-                <div className="section-heading">
-                  <div>
-                    <p className="section-kicker">Repository</p>
-                    <h2>Repo insights</h2>
-                  </div>
-                  <span className="section-chip">{status.active ? "Live" : "Idle"}</span>
-                </div>
-                {status.active ? (
-                  <div className="git-actions">
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={() => {
-                        void viewDiff();
-                      }}
-                    >
-                      Inspect changes
-                    </button>
-                  </div>
-                ) : null}
-                {!status.active ? <p className="git-empty">Start a session to see repo status.</p> : null}
-                {status.active && isLoadingGitStatus ? <p className="git-empty">Loading repo status...</p> : null}
-                {status.active && gitStatus ? (
-                  gitStatus.isGitRepo ? (
-                    <div className="git-stats">
-                      <article className="git-stat-card">
-                        <span className="git-stat-label">Branch</span>
-                        <strong>{gitStatus.branch || "Unknown"}</strong>
-                      </article>
-                      <article className="git-stat-card">
-                        <span className="git-stat-label">Changed files</span>
-                        <strong>{gitStatus.changedFilesCount}</strong>
-                      </article>
-                      <article className="git-stat-card">
-                        <span className="git-stat-label">Staged files</span>
-                        <strong>{gitStatus.stagedFilesCount}</strong>
-                      </article>
-                      <article className="git-stat-card">
-                        <span className="git-stat-label">Untracked files</span>
-                        <strong>{gitStatus.untrackedFilesCount}</strong>
-                      </article>
-                    </div>
-                  ) : (
-                    <p className="git-empty">{gitStatus.message || "This folder is not a Git repository."}</p>
-                  )
-                ) : null}
-                {status.active && (diffViewer.isLoading || diffViewer.error || diffViewer.diff) ? (
-                  <div className="diff-viewer">
-                    <div className="diff-header">
-                      <h3>Current diff</h3>
-                      <div className="diff-actions">
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => {
-                            void copyLoadedDiff();
-                          }}
-                          disabled={!diffPanelText}
-                        >
-                          Copy diff
-                        </button>
-                      </div>
-                    </div>
-                    {diffViewer.isLoading ? <p className="git-empty">Loading diff...</p> : null}
-                    {!diffViewer.isLoading && diffViewer.error ? <p className="git-empty">{diffViewer.error}</p> : null}
-                    {!diffViewer.isLoading && !diffViewer.error && diffEmptyState ? (
-                      <p className="git-empty">{diffEmptyState}</p>
-                    ) : null}
-                    {!diffViewer.isLoading && !diffViewer.error && diffPanelText ? (
-                      <pre className="diff-panel">{diffPanelText}</pre>
-                    ) : null}
-                  </div>
-                ) : null}
-              </section>
-
-              <section className="history-section rail-card">
-                <div className="section-heading">
-                  <div>
-                    <p className="section-kicker">History</p>
-                    <h2>Session history</h2>
-                  </div>
-                  <span className="section-chip">{sessions.length}</span>
-                </div>
-                <div className="history-list">
-                  {isLoadingSessions ? <p className="history-empty">Loading recent sessions...</p> : null}
-                  {!isLoadingSessions && sessions.length === 0 ? (
-                    <p className="history-empty">No saved sessions yet.</p>
-                  ) : null}
-                  {sessions.map((session) => (
-                    <article className="history-item" key={session.id}>
-                      <p className="history-repo">{session.repoPath}</p>
-                      <p className="history-meta">
-                        <span>{new Date(session.startTime).toLocaleString()}</span>
-                        <span>{formatDuration(session.durationMs)}</span>
-                      </p>
-                      <div className="history-actions">
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => {
-                            void viewTranscript(session);
-                          }}
-                        >
-                          View transcript
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                {transcriptViewer.session ? (
-                  <div className="transcript-viewer">
-                    <div className="transcript-header">
-                      <div>
-                        <h3>Transcript</h3>
-                        <p className="history-repo">{transcriptViewer.session.repoPath}</p>
-                        <p className="history-meta">
-                          <span>{new Date(transcriptViewer.session.startTime).toLocaleString()}</span>
-                          <span>
-                            {transcriptViewer.session.endTime
-                              ? new Date(transcriptViewer.session.endTime).toLocaleString()
-                              : "In progress"}
-                          </span>
-                          <span>{formatDuration(transcriptViewer.session.durationMs)}</span>
-                        </p>
-                      </div>
-                      <div className="transcript-actions">
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => {
-                            void copyLoadedTranscript();
-                          }}
-                          disabled={!transcriptViewer.transcript}
-                        >
-                          Copy transcript
-                        </button>
-                      </div>
-                    </div>
-                    {transcriptViewer.isLoading ? <p className="history-empty">Loading transcript...</p> : null}
-                    {!transcriptViewer.isLoading && transcriptViewer.error ? (
-                      <p className="history-empty">{transcriptViewer.error}</p>
-                    ) : null}
-                    {!transcriptViewer.isLoading && !transcriptViewer.error ? (
-                      <pre className="transcript-panel">{transcriptViewer.transcript || "Transcript is empty."}</pre>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="transcript-empty-state">
-                    <strong>Transcript viewer</strong>
-                    <p>Open any recent session to read its transcript here.</p>
-                  </div>
-                )}
-              </section>
-            </aside>
-          </div>
-        </>
+        <ConsoleView
+          projectControls={{
+            status,
+            repoPath,
+            onRepoPathChange: setRepoPath,
+            onChooseRepo: handleChooseRepo,
+            repoPickerMessage,
+            onStartSession: startSession,
+            onStopSession: stopSession,
+            connectionStateLabel: formatConnectionState(connectionState),
+            defaultRepoRoot: settings.defaultRepoRoot,
+            isLoadingSettings,
+            recentProjects,
+            isLoadingRecentProjects
+          }}
+          pendingContextPanel={{
+            pendingContextItems,
+            readyPendingItemCount,
+            pendingContextEmptyState,
+            pendingContextPreviewLines,
+            onClearAll: clearAllPendingContext,
+            onCopyRelativePath: (relativePath) => {
+              void copyItemRelativePath(relativePath);
+            },
+            onRemoveAttachment: removeAttachment
+          }}
+          composerPanel={{
+            status,
+            promptText,
+            onPromptTextChange: setPromptText,
+            onPromptPaste: handlePromptPaste,
+            onDrop: handleDrop,
+            onFileSelection: handleFileSelection,
+            fileInputRef,
+            promptInputRef,
+            promptPreviewSummary,
+            promptPreviewSections,
+            generatedPromptPreview,
+            isPromptPreviewExpanded,
+            onTogglePromptPreview: () => setIsPromptPreviewExpanded((current) => !current),
+            onCopyPromptPreview: () => {
+              void copyPromptPreview();
+            },
+            onSendPrompt: sendPrompt,
+            contextMessage
+          }}
+          repoInsightsPanel={{
+            status,
+            gitStatus,
+            isLoadingGitStatus,
+            diffViewer,
+            diffPanelText,
+            diffEmptyState,
+            onViewDiff: () => {
+              void viewDiff();
+            },
+            onCopyDiff: () => {
+              void copyLoadedDiff();
+            }
+          }}
+          sessionHistoryPanel={{
+            sessions,
+            isLoadingSessions,
+            transcriptViewer,
+            onViewTranscript: (session) => {
+              void viewTranscript(session);
+            },
+            onCopyTranscript: () => {
+              void copyLoadedTranscript();
+            },
+            formatDuration
+          }}
+          status={status}
+          terminalContainerRef={terminalContainerRef}
+        />
       ) : (
         <section className="settings-section">
           <div className="settings-grid">

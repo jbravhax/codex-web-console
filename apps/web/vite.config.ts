@@ -8,6 +8,10 @@ const apiPort = Number(process.env.VITE_API_PORT || 8787);
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: "jsdom",
+    setupFiles: "./src/test/setup.ts"
+  },
   server: {
     host: webHost,
     port: webPort,

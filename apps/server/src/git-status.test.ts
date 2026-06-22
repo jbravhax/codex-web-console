@@ -12,7 +12,7 @@ describe("parseGitStatusOutput", () => {
       repoPath: "/workspace/project",
       isGitRepo: true,
       branch: "main",
-      changedFilesCount: 1,
+      changedFilesCount: 2,
       stagedFilesCount: 1,
       untrackedFilesCount: 1
     });
@@ -23,6 +23,24 @@ describe("parseGitStatusOutput", () => {
 
     expect(summary.branch).toBe("detached");
     expect(summary.changedFilesCount).toBe(0);
+    expect(summary.stagedFilesCount).toBe(0);
+    expect(summary.untrackedFilesCount).toBe(0);
+  });
+
+  it("counts a staged-only file as changed and staged", () => {
+    const summary = parseGitStatusOutput("/workspace/project", ["## feature/staged-only", "M  src/server.ts"].join("\n"));
+
+    expect(summary.branch).toBe("feature/staged-only");
+    expect(summary.changedFilesCount).toBe(1);
+    expect(summary.stagedFilesCount).toBe(1);
+    expect(summary.untrackedFilesCount).toBe(0);
+  });
+
+  it("counts an unstaged-only file as changed without staging it", () => {
+    const summary = parseGitStatusOutput("/workspace/project", ["## feature/unstaged-only", " M src/app.ts"].join("\n"));
+
+    expect(summary.branch).toBe("feature/unstaged-only");
+    expect(summary.changedFilesCount).toBe(1);
     expect(summary.stagedFilesCount).toBe(0);
     expect(summary.untrackedFilesCount).toBe(0);
   });

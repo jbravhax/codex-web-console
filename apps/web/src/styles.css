@@ -41,6 +41,8 @@
   --shadow-soft: 0 18px 48px rgba(15, 23, 42, 0.08);
 }
 
+/* Base */
+
 * {
   box-sizing: border-box;
 }
@@ -142,6 +144,8 @@ textarea {
   padding: 2rem;
 }
 
+/* Header and banner */
+
 .page-header {
   display: flex;
   align-items: end;
@@ -178,18 +182,6 @@ textarea {
   font-size: 0.8rem;
   letter-spacing: 0.12em;
   color: #fbbf24;
-}
-
-.status-chip {
-  border: 1px solid var(--input-border);
-  border-radius: 999px;
-  padding: 0.55rem 0.9rem;
-  color: var(--muted);
-}
-
-.status-chip.active {
-  border-color: var(--success-border);
-  color: var(--success);
 }
 
 .tab-row {
@@ -346,16 +338,13 @@ textarea {
   font-size: 0.95rem;
 }
 
-.control-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 0.75rem;
-}
+/* Layout primitives */
 
-.workspace-grid {
+.repo-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .terminal-section {
@@ -452,14 +441,6 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-}
-
-.pending-context-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-top: 1rem;
 }
 
 .pending-context-subtitle {
@@ -648,29 +629,6 @@ textarea {
   margin-top: 0.35rem;
 }
 
-.document-list {
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.document-chip {
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  background: var(--panel-bg);
-  padding: 0.9rem 1rem;
-}
-
-.document-chip strong,
-.document-chip span {
-  display: block;
-}
-
-.document-chip span {
-  margin-top: 0.35rem;
-  color: var(--muted);
-}
-
 .history-section {
   margin-top: 1rem;
   padding: 1rem;
@@ -691,20 +649,8 @@ textarea {
   overflow: hidden;
 }
 
-.git-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.9rem;
-}
-
 .git-actions {
   margin-bottom: 0.9rem;
-}
-
-.git-header h2 {
-  margin: 0;
 }
 
 .git-stats {
@@ -766,7 +712,6 @@ textarea {
   margin-bottom: 0.3rem;
 }
 
-.history-header,
 .history-meta {
   display: flex;
   align-items: center;
@@ -774,11 +719,6 @@ textarea {
   gap: 1rem;
 }
 
-.history-header {
-  margin-bottom: 0.9rem;
-}
-
-.history-header h2,
 .history-item p {
   margin: 0;
 }
@@ -885,6 +825,8 @@ textarea {
   gap: 1rem;
   margin-top: 1rem;
 }
+
+/* Product layout and sections */
 
 .page-header {
   align-items: center;
@@ -1062,8 +1004,15 @@ textarea {
   line-height: 1.55;
 }
 
+.repo-picker-message {
+  margin-top: 0.45rem;
+}
+
 .terminal-section {
   padding: 1.25rem;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
 }
 
 .terminal-stage-header,
@@ -1084,8 +1033,8 @@ textarea {
 }
 
 .terminal-panel {
-  height: 68vh;
-  min-height: 500px;
+  height: 62vh;
+  min-height: 440px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 24px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -1093,6 +1042,7 @@ textarea {
 
 .composer-card {
   padding: 1.35rem;
+  margin-top: 0;
 }
 
 .composer-label {
@@ -1156,18 +1106,6 @@ textarea {
   padding: 1.25rem;
 }
 
-.git-header,
-.history-header {
-  margin-bottom: 1rem;
-}
-
-.git-header h2,
-.history-header h2 {
-  font-size: 1.2rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
-
 .git-stats {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1200,6 +1138,8 @@ textarea {
 .settings-section {
   padding: 1.5rem;
 }
+
+/* Feedback */
 
 .success-banner {
   padding: 0.85rem 1rem;
@@ -1239,7 +1179,6 @@ textarea {
   .diff-header,
   .diff-actions,
   .attachment-actions,
-  .pending-context-header,
   .attachment-buttons,
   .attachment-chip,
   .attachment-title-row {
@@ -1252,12 +1191,11 @@ textarea {
     justify-content: start;
   }
 
-  .control-row {
+  .repo-input-row {
     grid-template-columns: 1fr;
   }
 
-  .meta-row,
-  .workspace-grid {
+  .meta-row {
     grid-template-columns: 1fr;
   }
 

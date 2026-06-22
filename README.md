@@ -37,7 +37,7 @@ All of these inputs appear together in one pending-context area in the UI so you
 4. Terminal output is streamed to the browser.
 5. Browser keystrokes are sent back to the running Codex process.
 
-Because this wraps the official Codex CLI, Codex runs locally and can read files, modify files, and run commands in the selected directory, subject to Codex’s own behavior and sandboxing configuration.
+Because this wraps the official Codex CLI, Codex runs locally and can read files, modify files, and run commands in the selected directory, subject to Codex's own behavior and sandboxing configuration.
 
 ## Linux prerequisites
 
@@ -271,7 +271,7 @@ Large pasted prompt context is stored inside the active repository under:
 .codex-web/documents/
 ```
 
-The app also ensures `.codex-web/` is added to the repo’s `.gitignore`.
+The app also ensures `.codex-web/` is added to the repo's `.gitignore`.
 
 Attachments are stored inside the active repository under:
 
@@ -318,6 +318,21 @@ The UI also supports:
 
 Removing an item only removes it from the next prompt context. It does not delete the saved file from disk.
 
+## Repo selection
+
+You can choose a repo in three ways:
+
+- Paste a repo path manually
+- Reuse a recent project from the recent-projects list
+- Use the `Choose repo` button when the browser supports the File System Access API
+
+Notes:
+
+- The browser picker uses `window.showDirectoryPicker()` when available.
+- Some browsers let you pick a folder but do not expose a usable absolute filesystem path back to the page.
+- When that happens, the app does not guess or fake a path. It tells you to paste the repo path manually instead.
+- Manual path entry remains available in every browser.
+
 ## Safety limits
 
 Current local limits:
@@ -337,9 +352,11 @@ Unsupported files inside ZIP uploads are skipped and recorded in extraction meta
 - `GET /health`
 - `GET /api/settings`
 - `POST /api/settings`
+- `GET /api/recent-projects`
 - `GET /api/sessions`
 - `GET /api/sessions/:id/transcript`
 - `GET /api/git/status?repoPath=`
+- `GET /api/git/diff?repoPath=`
 - `POST /api/documents`
 - `POST /api/attachments`
 - WebSocket: `/ws/session`
@@ -354,7 +371,7 @@ Key points:
 - There is no authentication.
 - The app is designed to run on your own machine, not to be exposed to a network.
 - The web UI does not execute arbitrary shell commands from the browser.
-- The Git panel is read-only and only runs a fixed `git status --porcelain --branch` command.
+- The Git panel is read-only and only runs fixed `git status --porcelain --branch`, `git diff --no-ext-diff`, and `git diff --cached --no-ext-diff` commands.
 - Session startup validates directories before launching Codex and rejects obvious dangerous paths.
 - Settings exposed to the frontend are limited to explicit non-secret values.
 

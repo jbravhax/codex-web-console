@@ -48,12 +48,12 @@ export function parseGitStatusOutput(repoPath: string, stdout: string): GitStatu
       continue;
     }
 
-    if (indexStatus !== " ") {
-      stagedFilesCount += 1;
+    if (indexStatus !== " " || workTreeStatus !== " ") {
+      changedFilesCount += 1;
     }
 
-    if (workTreeStatus !== " ") {
-      changedFilesCount += 1;
+    if (indexStatus !== " ") {
+      stagedFilesCount += 1;
     }
   }
 
