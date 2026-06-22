@@ -17,4 +17,21 @@ describe("stripTerminalSequences", () => {
   it("collapses simple backspace overwrite sequences", () => {
     expect(stripTerminalSequences("ab\u0008c")).toBe("ac");
   });
+
+  it("handles nested terminal control patterns while preserving visible text", () => {
+    expect(stripTerminalSequences("Start\u001b[31mred\u001b]0;AIRE\u0007\u001b[0mDone")).toBe("StartredDone");
+  });
+
+  it("keeps the final visible text for carriage-return overwrite output", () => {
+    expect(stripTerminalSequences("Progress 10%\rProgress 90%\rProgress 100%\nDone")).toBe("Progress 100%\nDone");
+  });
+
+  it("drops partial trailing control sequences without stripping meaningful text", () => {
+    expect(stripTerminalSequences("Ready\u001b[31")).toBe("Ready");
+    expect(stripTerminalSequences("Title\u001b]0;Codex")).toBe("Title");
+  });
+
+  it("preserves meaningful text when mixed with clear-screen and overwrite artifacts", () => {
+    expect(stripTerminalSequences("hello\u001b[2J\rstatus: waiting\r\u001b[2Kstatus: done\nNext")).toBe("status: done\nNext");
+  });
 });

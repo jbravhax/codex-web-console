@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import * as clipboardModule from "./clipboard";
 import { loadGitDiff } from "./git-diff-viewer";
 import { REPO_PICKER_UNSUPPORTED_MESSAGE, chooseRepoDirectory } from "./repo-picker";
 import { loadSessionTranscript } from "./session-transcripts";
@@ -216,6 +217,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("App integration", () => {
@@ -422,6 +424,71 @@ describe("App integration", () => {
 
     fireEvent.click(transcriptButtons[1]);
     expect(await screen.findByText("Session transcript not found.")).toBeTruthy();
+  });
+
+  it("shows a fallback success message when copy uses the browser fallback", async () => {
+    vi.spyOn(clipboardModule, "copyTextWithFallback").mockResolvedValue({
+      method: "fallback",
+      clipboardBlocked: true
+    });
+
+    vi.mocked(loadSessionTranscript).mockResolvedValueOnce("session transcript text");
+
+    renderApp({
+      sessions: {
+        items: [
+          {
+            id: "session-1",
+            repoPath: "/workspace/project-one",
+            startTime: "2026-06-21T12:00:00.000Z",
+            endTime: "2026-06-21T12:02:00.000Z",
+            durationMs: 120000
+          }
+        ]
+      }
+    });
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
+    await screen.findByText("session transcript text");
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
+
+    expect(
+      await screen.findByText("Copied the transcript using the browser fallback after direct clipboard access was blocked.")
+    ).toBeTruthy();
+  });
+
+  it("shows a specific error when clipboard access is blocked and no fallback path exists", async () => {
+    vi.spyOn(clipboardModule, "copyTextWithFallback").mockRejectedValue(
+      new clipboardModule.CopyTextError("clipboard-blocked", true)
+    );
+
+    vi.mocked(loadSessionTranscript).mockResolvedValueOnce("session transcript text");
+
+    renderApp({
+      sessions: {
+        items: [
+          {
+            id: "session-1",
+            repoPath: "/workspace/project-one",
+            startTime: "2026-06-21T12:00:00.000Z",
+            endTime: "2026-06-21T12:02:00.000Z",
+            durationMs: 120000
+          }
+        ]
+      }
+    });
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
+    await screen.findByText("session transcript text");
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
+
+    expect(
+      await screen.findByText(
+        "Direct clipboard access was blocked, and this browser does not offer a fallback copy path for the transcript."
+      )
+    ).toBeTruthy();
   });
 
   it("shows loading and empty diff states while inspecting repo changes", async () => {

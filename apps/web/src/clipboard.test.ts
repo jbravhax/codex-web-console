@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { copyTextWithFallback } from "./clipboard";
+import { CopyTextError, copyTextWithFallback } from "./clipboard";
 
 describe("copyTextWithFallback", () => {
   it("uses navigator clipboard when available", async () => {
@@ -7,7 +7,10 @@ describe("copyTextWithFallback", () => {
       writeText: vi.fn().mockResolvedValue(undefined)
     };
 
-    await copyTextWithFallback("copied text", clipboard);
+    await expect(copyTextWithFallback("copied text", clipboard)).resolves.toEqual({
+      method: "clipboard",
+      clipboardBlocked: false
+    });
 
     expect(clipboard.writeText).toHaveBeenCalledWith("copied text");
   });
@@ -32,14 +35,17 @@ describe("copyTextWithFallback", () => {
       execCommand: vi.fn().mockReturnValue(true)
     } as unknown as Document;
 
-    await copyTextWithFallback("fallback transcript", clipboard, doc);
+    await expect(copyTextWithFallback("fallback transcript", clipboard, doc)).resolves.toEqual({
+      method: "fallback",
+      clipboardBlocked: true
+    });
 
     expect(clipboard.writeText).toHaveBeenCalledWith("fallback transcript");
     expect(doc.createElement).toHaveBeenCalledWith("textarea");
     expect(doc.execCommand).toHaveBeenCalledWith("copy");
   });
 
-  it("throws when both clipboard and fallback fail", async () => {
+  it("throws a structured error when clipboard is blocked and fallback copy fails", async () => {
     const clipboard = {
       writeText: vi.fn().mockRejectedValue(new Error("clipboard blocked"))
     };
@@ -58,6 +64,18 @@ describe("copyTextWithFallback", () => {
       execCommand: vi.fn().mockReturnValue(false)
     } as unknown as Document;
 
-    await expect(copyTextWithFallback("fallback transcript", clipboard, doc)).rejects.toThrow("Fallback copy failed.");
+    await expect(copyTextWithFallback("fallback transcript", clipboard, doc)).rejects.toMatchObject({
+      code: "copy-failed",
+      clipboardBlocked: true
+    });
+  });
+
+  it("throws a structured error when no clipboard fallback is available", async () => {
+    await expect(
+      copyTextWithFallback("copied text", {} as Pick<Clipboard, "writeText">, undefined as unknown as Document)
+    ).rejects.toMatchObject({
+      code: "fallback-unavailable",
+      clipboardBlocked: false
+    });
   });
 });

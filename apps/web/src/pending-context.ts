@@ -275,11 +275,11 @@ export function buildPromptPreviewOutput(prompt: string, items: PendingContextIt
   return buildPromptWithPendingContext(prompt, items);
 }
 
-export function copyRelativePath(relativePath: string): Promise<void> {
+export function copyRelativePath(relativePath: string) {
   return copyTextWithFallback(relativePath);
 }
 
-export function copyGeneratedPromptContext(text: string): Promise<void> {
+export function copyGeneratedPromptContext(text: string) {
   return copyTextWithFallback(text);
 }
 

@@ -52,6 +52,6 @@ export function copyGitDiffText(
   text: string,
   clipboard: Pick<Clipboard, "writeText"> | undefined = navigator.clipboard,
   doc: Document = document
-): Promise<void> {
+){
   return copyTextWithFallback(text, clipboard, doc);
 }

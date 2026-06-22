@@ -82,6 +82,9 @@ describe("session transcript helpers", () => {
       execCommand: vi.fn().mockReturnValue(false)
     } as unknown as Document;
 
-    await expect(copyTranscriptText("fallback transcript", clipboard, doc)).rejects.toThrow("Fallback copy failed.");
+    await expect(copyTranscriptText("fallback transcript", clipboard, doc)).rejects.toMatchObject({
+      code: "copy-failed",
+      clipboardBlocked: true
+    });
   });
 });

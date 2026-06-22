@@ -45,6 +45,7 @@ import {
   updateUploadingProgress,
   type PendingContextItem
 } from "./pending-context";
+import { CopyTextError, type CopyTextResult } from "./clipboard";
 import { createInitialSessionBanner, reduceSessionBanner, type SessionBanner } from "./session-banner";
 import { buildSessionWebSocketUrl } from "./session-connection";
 import { copyTranscriptText, loadSessionTranscript } from "./session-transcripts";
@@ -138,13 +139,40 @@ export function App() {
   const diffPanelText = diffViewer.diff ? buildGitDiffPanelText(diffViewer.diff) : "";
   const diffEmptyState = diffViewer.diff ? buildGitDiffEmptyState(diffViewer.diff) : "";
 
-  const setCopyFeedback = (subject: string) => {
+  const setCopyFeedback = (subject: string, result: CopyTextResult) => {
+    if (result.method === "fallback") {
+      setContextMessage(
+        result.clipboardBlocked
+          ? `Copied ${subject} using the browser fallback after direct clipboard access was blocked.`
+          : `Copied ${subject} using the browser fallback.`
+      );
+      setError("");
+      return;
+    }
+
     setContextMessage(`Copied ${subject}.`);
     setError("");
   };
 
-  const setClipboardFailure = (subject: string) => {
-    setError(`Could not copy ${subject}. Your browser may have blocked clipboard access.`);
+  const setClipboardFailure = (subject: string, copyError: unknown) => {
+    if (copyError instanceof CopyTextError) {
+      if (copyError.code === "clipboard-blocked") {
+        setError(`Direct clipboard access was blocked, and this browser does not offer a fallback copy path for ${subject}.`);
+        return;
+      }
+
+      if (copyError.code === "fallback-unavailable") {
+        setError(`Could not copy ${subject} because this browser does not offer a fallback copy path.`);
+        return;
+      }
+
+      if (copyError.code === "copy-failed" && copyError.clipboardBlocked) {
+        setError(`Direct clipboard access was blocked, and the browser fallback copy failed for ${subject}.`);
+        return;
+      }
+    }
+
+    setError(`Could not copy ${subject}.`);
   };
 
   useEffect(() => {
@@ -727,10 +755,10 @@ export function App() {
 
   const copyItemRelativePath = async (relativePath: string) => {
     try {
-      await copyRelativePath(relativePath);
-      setCopyFeedback(relativePath);
-    } catch {
-      setClipboardFailure("that relative path");
+      const result = await copyRelativePath(relativePath);
+      setCopyFeedback(relativePath, result);
+    } catch (copyError) {
+      setClipboardFailure("that relative path", copyError);
     }
   };
 
@@ -763,10 +791,10 @@ export function App() {
 
   const copyPromptPreview = async () => {
     try {
-      await copyGeneratedPromptContext(generatedPromptPreview);
-      setCopyFeedback("exactly what Codex will receive");
-    } catch {
-      setClipboardFailure("the prompt preview");
+      const result = await copyGeneratedPromptContext(generatedPromptPreview);
+      setCopyFeedback("exactly what Codex will receive", result);
+    } catch (copyError) {
+      setClipboardFailure("the prompt preview", copyError);
     }
   };
 
@@ -802,10 +830,10 @@ export function App() {
     }
 
     try {
-      await copyTranscriptText(transcriptViewer.transcript);
-      setCopyFeedback("the transcript");
-    } catch {
-      setClipboardFailure("the transcript");
+      const result = await copyTranscriptText(transcriptViewer.transcript);
+      setCopyFeedback("the transcript", result);
+    } catch (copyError) {
+      setClipboardFailure("the transcript", copyError);
     }
   };
 
@@ -842,10 +870,10 @@ export function App() {
     }
 
     try {
-      await copyGitDiffText(diffPanelText);
-      setCopyFeedback("the diff");
-    } catch {
-      setClipboardFailure("the diff");
+      const result = await copyGitDiffText(diffPanelText);
+      setCopyFeedback("the diff", result);
+    } catch (copyError) {
+      setClipboardFailure("the diff", copyError);
     }
   };
 

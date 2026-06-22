@@ -27,6 +27,6 @@ export async function copyTranscriptText(
   transcript: string,
   clipboard: Pick<Clipboard, "writeText"> | undefined = navigator.clipboard,
   doc: Document = document
-): Promise<void> {
-  await copyTextWithFallback(transcript, clipboard, doc);
+){
+  return copyTextWithFallback(transcript, clipboard, doc);
 }
