@@ -125,6 +125,18 @@ function formatDuration(durationMs: number | null): string {
   return `${minutes}m ${seconds}s`;
 }
 
+function formatConnectionState(state: "connecting" | "connected" | "disconnected"): string {
+  if (state === "connected") {
+    return "Connected";
+  }
+
+  if (state === "connecting") {
+    return "Connecting";
+  }
+
+  return "Offline";
+}
+
 export function App() {
   const terminalContainerRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -665,7 +677,7 @@ export function App() {
     }
   };
 
-  const handleDrop = async (event: DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
     const droppedFiles = Array.from(event.dataTransfer.files ?? []);
     if (droppedFiles.length === 0) {
@@ -827,18 +839,19 @@ export function App() {
   const pendingContextEmptyState = !status.active
     ? "Start a session, then paste text, drop files, or upload context for Codex."
     : "Paste text, drop files, or upload context for Codex.";
+  const promptPreviewSummary = generatedPromptPreview.trim()
+    ? `${promptText.trim() ? "Prompt ready" : "Context ready"} with ${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"}.`
+    : "Nothing will be sent yet.";
 
   return (
     <div className="app-shell">
       <header className="page-header">
-        <div>
+        <div className="page-header-copy">
           <p className="eyebrow">Local only</p>
           <h1>Codex CLI Web Console</h1>
+          <p className="page-header-subtitle">A calm browser workspace for the Codex CLI running on this machine.</p>
         </div>
         <div className="header-actions">
-          <div className={`status-chip ${status.active ? "active" : ""}`}>
-            {status.active ? "Session running" : "No active session"}
-          </div>
           <div className="tab-row">
             <button
               type="button"
@@ -868,69 +881,217 @@ export function App() {
 
       {activeView === "console" ? (
         <>
-          <section className="controls">
-            <label htmlFor="repo-path">Repo path</label>
-            <div className="control-row">
-              <input
-                id="repo-path"
-                type="text"
-                value={repoPath}
-                onChange={(event) => setRepoPath(event.target.value)}
-                placeholder={settings.defaultRepoRoot || "/home/you/project"}
-              />
-              <button type="button" onClick={startSession} disabled={status.active || !repoPath.trim()}>
-                Start session
-              </button>
-              <button type="button" onClick={stopSession} disabled={!status.active} className="secondary">
-                Stop session
-              </button>
-            </div>
-            <div className="recent-projects">
-              <div className="recent-projects-header">
-                <strong>Recent projects</strong>
-                <span>{recentProjects.length}</span>
-              </div>
-              {isLoadingRecentProjects ? <p className="helper-text">Loading recent projects...</p> : null}
-              {!isLoadingRecentProjects && recentProjects.length === 0 ? (
-                <p className="helper-text">No recent projects yet.</p>
-              ) : null}
-              {recentProjects.length > 0 ? (
-                <div className="recent-project-list">
-                  {recentProjects.map((project) => (
-                    <button
-                      key={project.repoPath}
-                      type="button"
-                      className={`recent-project-chip ${project.available ? "" : "unavailable"}`}
-                      onClick={() => setRepoPath(project.repoPath)}
-                      disabled={!project.available}
-                    >
-                      <span className="recent-project-path">{project.repoPath}</span>
-                      <span className="recent-project-meta">
-                        {project.available ? `${project.openCount} open${project.openCount === 1 ? "" : "s"}` : "Unavailable"}
-                      </span>
-                    </button>
-                  ))}
+          <div className="console-layout">
+            <aside className="control-rail">
+              <section className="controls rail-card">
+                <div className="section-heading">
+                  <div>
+                    <p className="section-kicker">Workspace</p>
+                    <h2>Project</h2>
+                  </div>
+                  <span className="section-chip">{status.active ? "Active" : "Ready"}</span>
                 </div>
-              ) : null}
-            </div>
-            <p className="helper-text">
-              Connection: {connectionState}. Default repo root:{" "}
-              {isLoadingSettings ? "loading..." : settings.defaultRepoRoot || "not loaded"}.
-            </p>
-          </section>
+                <label htmlFor="repo-path">Repo path</label>
+                <input
+                  id="repo-path"
+                  type="text"
+                  value={repoPath}
+                  onChange={(event) => setRepoPath(event.target.value)}
+                  placeholder={settings.defaultRepoRoot || "/home/you/project"}
+                />
+                <div className="control-actions">
+                  <button type="button" onClick={startSession} disabled={status.active || !repoPath.trim()}>
+                    Start session
+                  </button>
+                  <button type="button" onClick={stopSession} disabled={!status.active} className="destructive">
+                    Stop session
+                  </button>
+                </div>
+                <div className="meta-row">
+                  <div className="meta-pill">
+                    <span className="meta-label">Server</span>
+                    <strong>{formatConnectionState(connectionState)}</strong>
+                  </div>
+                  <div className="meta-pill">
+                    <span className="meta-label">Default repo root</span>
+                    <strong>{isLoadingSettings ? "Loading..." : settings.defaultRepoRoot || "Choose a folder"}</strong>
+                  </div>
+                </div>
+                <div className="recent-projects">
+                  <div className="recent-projects-header">
+                    <strong>Recent projects</strong>
+                    <span className="section-chip">{recentProjects.length}</span>
+                  </div>
+                  {isLoadingRecentProjects ? <p className="helper-text">Loading recent projects...</p> : null}
+                  {!isLoadingRecentProjects && recentProjects.length === 0 ? (
+                    <p className="helper-text">Open a project once and it will appear here for quick reuse.</p>
+                  ) : null}
+                  {recentProjects.length > 0 ? (
+                    <div className="recent-project-list">
+                      {recentProjects.map((project) => (
+                        <button
+                          key={project.repoPath}
+                          type="button"
+                          className={`recent-project-chip ${project.available ? "" : "unavailable"}`}
+                          onClick={() => setRepoPath(project.repoPath)}
+                          disabled={!project.available}
+                        >
+                          <span className="recent-project-path">{project.repoPath}</span>
+                          <span className="recent-project-meta">
+                            {project.available
+                              ? `${project.openCount} open${project.openCount === 1 ? "" : "s"}`
+                              : "Unavailable"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
 
-          <div className="workspace-grid">
-            <section className="terminal-section">
-              <div ref={terminalContainerRef} className="terminal-panel" />
-              <div className="prompt-panel">
-                <label htmlFor="prompt-input">Prompt</label>
-                <div
-                  className="attachment-dropzone"
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    void handleDrop(event);
-                  }}
-                >
+              <section className="rail-card context-card">
+                <div className="section-heading">
+                  <div>
+                    <p className="section-kicker">Context</p>
+                    <h2>Ready context</h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={clearAllPendingContext}
+                    disabled={pendingContextItems.length === 0}
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <p className="pending-context-subtitle">
+                  {readyPendingItemCount > 0
+                    ? `${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"} will be included with the next prompt.`
+                    : pendingContextItems.length > 0
+                      ? "Context is still being prepared."
+                      : pendingContextEmptyState}
+                </p>
+                {pendingContextItems.length === 0 ? (
+                  <p className="empty-context">
+                    Paste text, drop files, or upload context for Codex. Larger pasted text becomes a local markdown
+                    file automatically.
+                  </p>
+                ) : (
+                  <div className="attachment-list">
+                    {pendingContextItems.map((item) => (
+                      <article
+                        className={`attachment-chip ${item.warningText ? "warning" : ""} ${
+                          item.uploadState === "uploading" ? "uploading" : ""
+                        }`}
+                        key={item.id}
+                      >
+                        <div className="attachment-main">
+                          <div className="attachment-title-row">
+                            <strong className="attachment-title">
+                              <span className="attachment-icon" aria-hidden="true">
+                                {item.icon}
+                              </span>
+                              {item.name}
+                            </strong>
+                            <div className="attachment-badges compact">
+                              <span className="attachment-badge">{item.typeLabel}</span>
+                              <span
+                                className={`attachment-badge ${
+                                  item.uploadState === "ready" ? "ready" : "uploading"
+                                }`}
+                              >
+                                {item.uploadState === "ready" ? "Ready" : "Uploading"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="attachment-meta-line">
+                            <span>
+                              {item.kind === "generated-document"
+                                ? `${item.sizeBytes.toLocaleString()} characters`
+                                : formatAttachmentSize(item.sizeBytes)}
+                            </span>
+                            {item.warningText ? (
+                              <span className="attachment-inline-warning">Skipped files inside ZIP</span>
+                            ) : null}
+                          </div>
+                          <span className="attachment-path">{item.relativePath || item.detailLine}</span>
+                          {item.relativePath ? <span className="attachment-detail">{item.detailLine}</span> : null}
+                          {item.uploadState === "uploading" && item.progressPercent !== null ? (
+                            <div className="progress-group">
+                              <span className="progress-text">Uploading... {item.progressPercent}%</span>
+                              <div className="progress-bar" aria-hidden="true">
+                                <div className="progress-bar-fill" style={{ width: `${item.progressPercent}%` }} />
+                              </div>
+                            </div>
+                          ) : null}
+                          {item.warningText ? <span className="warning-text">Warning: {item.warningText}</span> : null}
+                        </div>
+                        <div className="attachment-buttons">
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => {
+                              void copyItemRelativePath(item.relativePath);
+                            }}
+                            disabled={!item.relativePath || item.uploadState !== "ready"}
+                          >
+                            Copy path
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost destructive-text"
+                            onClick={() => removeAttachment(item.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                {pendingContextPreviewLines.length > 0 ? (
+                  <div className="context-preview">
+                    <strong>Pending context summary</strong>
+                    <ul className="context-preview-list">
+                      {pendingContextPreviewLines.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </section>
+            </aside>
+
+            <main className="workspace-main">
+              <section className="terminal-section workspace-card">
+                <div className="terminal-stage-header">
+                  <div>
+                    <p className="section-kicker">Console</p>
+                    <h2>Live Codex terminal</h2>
+                  </div>
+                  <div className="terminal-stage-meta">
+                    <span className="section-chip">{status.active ? "Interactive" : "Waiting"}</span>
+                  </div>
+                </div>
+                <div ref={terminalContainerRef} className="terminal-panel" />
+              </section>
+
+              <section
+                className="prompt-panel workspace-card composer-card"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  void handleDrop(event);
+                }}
+              >
+                <div className="composer-header">
+                  <div>
+                    <p className="section-kicker">Prompt</p>
+                    <h2>Guide Codex intentionally</h2>
+                    <p className="helper-text">
+                      Write the task, attach supporting context, and review the final assembled prompt before sending
+                      it.
+                    </p>
+                  </div>
                   <div className="attachment-actions">
                     <button
                       type="button"
@@ -940,125 +1101,23 @@ export function App() {
                     >
                       Attach files
                     </button>
-                    <span className="helper-text">
-                      Drag files here or paste an image into the prompt box.
-                    </span>
+                    <span className="helper-text">Drag files here or paste an image directly into the prompt box.</span>
                   </div>
-                  <div className="pending-context-header">
-                    <div>
-                      <strong>Pending context</strong>
-                      <p className="pending-context-subtitle">
-                        {readyPendingItemCount > 0
-                          ? `The next prompt will include ${readyPendingItemCount} ready context item${readyPendingItemCount === 1 ? "" : "s"}.`
-                          : pendingContextItems.length > 0
-                            ? "Context is still uploading."
-                            : "Nothing extra will be added to the next prompt yet."}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={clearAllPendingContext}
-                      disabled={pendingContextItems.length === 0}
-                    >
-                      Clear all pending context
-                    </button>
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    className="hidden-input"
-                    type="file"
-                    multiple
-                    accept=".txt,.md,.json,.csv,.log,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp,.pdf,.zip"
-                    onChange={(event) => {
-                      void handleFileSelection(event);
-                    }}
-                    disabled={!status.active}
-                  />
-                  {pendingContextItems.length === 0 ? (
-                    <p className="empty-context">{pendingContextEmptyState}</p>
-                  ) : (
-                    <>
-                      <div className="attachment-list">
-                        {pendingContextItems.map((item) => (
-                          <article
-                            className={`attachment-chip ${item.warningText ? "warning" : ""} ${
-                              item.uploadState === "uploading" ? "uploading" : ""
-                            }`}
-                            key={item.id}
-                          >
-                            <div className="attachment-main">
-                              <div className="attachment-title-row">
-                                <strong>
-                                  {item.icon} {item.name}
-                                </strong>
-                                <div className="attachment-badges">
-                                  <span className="attachment-badge">{item.typeLabel}</span>
-                                  <span className="attachment-badge subtle">
-                                    {item.kind === "generated-document"
-                                      ? `${item.sizeBytes.toLocaleString()} characters`
-                                      : formatAttachmentSize(item.sizeBytes)}
-                                  </span>
-                                  <span
-                                    className={`attachment-badge ${
-                                      item.uploadState === "ready" ? "ready" : "uploading"
-                                    }`}
-                                  >
-                                    {item.uploadState === "ready" ? "Ready" : "Uploading"}
-                                  </span>
-                                  {item.warningText ? <span className="attachment-badge warning">Warning</span> : null}
-                                </div>
-                              </div>
-                              <span className="attachment-path">{item.relativePath || item.detailLine}</span>
-                              {item.relativePath ? <span>{item.detailLine}</span> : null}
-                              {item.uploadState === "uploading" && item.progressPercent !== null ? (
-                                <div className="progress-group">
-                                  <span className="progress-text">Uploading... {item.progressPercent}%</span>
-                                  <div className="progress-bar" aria-hidden="true">
-                                    <div className="progress-bar-fill" style={{ width: `${item.progressPercent}%` }} />
-                                  </div>
-                                </div>
-                              ) : null}
-                              {item.warningText ? <span className="warning-text">Warning: {item.warningText}</span> : null}
-                            </div>
-                            <div className="attachment-buttons">
-                              <button
-                                type="button"
-                                className="secondary"
-                                onClick={() => {
-                                  void copyItemRelativePath(item.relativePath);
-                                }}
-                                disabled={!item.relativePath || item.uploadState !== "ready"}
-                              >
-                                Copy relative path
-                              </button>
-                              <button
-                                type="button"
-                                className="secondary"
-                                onClick={() => removeAttachment(item.id)}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                      {pendingContextPreviewLines.length > 0 ? (
-                        <div className="context-preview">
-                          <strong>Next prompt preview</strong>
-                          <p className="helper-text">
-                            Codex will be asked to inspect these saved files and folders before reading your typed prompt.
-                          </p>
-                          <ul className="context-preview-list">
-                            {pendingContextPreviewLines.map((line) => (
-                              <li key={line}>{line}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </>
-                  )}
                 </div>
+                <input
+                  ref={fileInputRef}
+                  className="hidden-input"
+                  type="file"
+                  multiple
+                  accept=".txt,.md,.json,.csv,.log,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp,.pdf,.zip"
+                  onChange={(event) => {
+                    void handleFileSelection(event);
+                  }}
+                  disabled={!status.active}
+                />
+                <label htmlFor="prompt-input" className="composer-label">
+                  Prompt
+                </label>
                 <textarea
                   id="prompt-input"
                   ref={promptInputRef}
@@ -1067,24 +1126,23 @@ export function App() {
                   onPaste={(event) => {
                     void handlePromptPaste(event);
                   }}
-                  placeholder="Type a prompt for Codex here. Large pasted text will be saved as a local markdown document."
+                  placeholder="Describe the task clearly. Large pasted text will be stored as a local markdown document instead of flooding the prompt."
                   disabled={!status.active}
+                  className="prompt-textarea"
                 />
                 <div className="prompt-preview-panel">
                   <div className="prompt-preview-header">
                     <div>
-                      <strong>What Codex Will Receive</strong>
-                      <p className="helper-text">
-                        Review the exact generated prompt context before sending it.
-                      </p>
+                      <strong>Review before sending</strong>
+                      <p className="helper-text">This preview uses the same generated prompt that will be sent to Codex.</p>
                     </div>
                     <div className="prompt-preview-actions">
                       <button
                         type="button"
-                        className="secondary"
+                        className="ghost"
                         onClick={() => setIsPromptPreviewExpanded((current) => !current)}
                       >
-                        {isPromptPreviewExpanded ? "Hide preview" : "Show preview"}
+                        {isPromptPreviewExpanded ? "Hide details" : "Show details"}
                       </button>
                       <button
                         type="button"
@@ -1094,10 +1152,11 @@ export function App() {
                         }}
                         disabled={!generatedPromptPreview.trim()}
                       >
-                        Copy generated context
+                        Copy preview
                       </button>
                     </div>
                   </div>
+                  <p className="prompt-preview-summary">{promptPreviewSummary}</p>
                   {isPromptPreviewExpanded ? (
                     <div className="prompt-preview-body">
                       <div className="prompt-preview-sections">
@@ -1119,154 +1178,171 @@ export function App() {
                   <button type="button" onClick={sendPrompt} disabled={!status.active}>
                     Send prompt
                   </button>
-                  <span className="helper-text">Pastes under 10,000 characters stay inline. Larger ones become files.</span>
+                  <span className="helper-text">
+                    Pasted text under 10,000 characters stays inline. Larger pastes become local files automatically.
+                  </span>
                 </div>
                 {contextMessage ? <p className="success-banner">{contextMessage}</p> : null}
-              </div>
-            </section>
+              </section>
+            </main>
 
-            <aside className="git-section">
-              <div className="git-header">
-                <h2>Git status</h2>
-                <span>{status.active ? "Live" : "Idle"}</span>
-              </div>
-              {status.active ? (
-                <div className="git-actions">
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => {
-                      void viewDiff();
-                    }}
-                  >
-                    View diff
-                  </button>
+            <aside className="insights-rail">
+              <section className="git-section rail-card">
+                <div className="section-heading">
+                  <div>
+                    <p className="section-kicker">Repository</p>
+                    <h2>Repo insights</h2>
+                  </div>
+                  <span className="section-chip">{status.active ? "Live" : "Idle"}</span>
                 </div>
-              ) : null}
-              {!status.active ? <p className="git-empty">Start a session to see repo status.</p> : null}
-              {status.active && isLoadingGitStatus ? <p className="git-empty">Loading repo status...</p> : null}
-              {status.active && gitStatus ? (
-                gitStatus.isGitRepo ? (
-                  <div className="git-stats">
-                    <article className="git-stat-card">
-                      <span className="git-stat-label">Branch</span>
-                      <strong>{gitStatus.branch || "Unknown"}</strong>
+                {status.active ? (
+                  <div className="git-actions">
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => {
+                        void viewDiff();
+                      }}
+                    >
+                      Inspect changes
+                    </button>
+                  </div>
+                ) : null}
+                {!status.active ? <p className="git-empty">Start a session to see repo status.</p> : null}
+                {status.active && isLoadingGitStatus ? <p className="git-empty">Loading repo status...</p> : null}
+                {status.active && gitStatus ? (
+                  gitStatus.isGitRepo ? (
+                    <div className="git-stats">
+                      <article className="git-stat-card">
+                        <span className="git-stat-label">Branch</span>
+                        <strong>{gitStatus.branch || "Unknown"}</strong>
+                      </article>
+                      <article className="git-stat-card">
+                        <span className="git-stat-label">Changed files</span>
+                        <strong>{gitStatus.changedFilesCount}</strong>
+                      </article>
+                      <article className="git-stat-card">
+                        <span className="git-stat-label">Staged files</span>
+                        <strong>{gitStatus.stagedFilesCount}</strong>
+                      </article>
+                      <article className="git-stat-card">
+                        <span className="git-stat-label">Untracked files</span>
+                        <strong>{gitStatus.untrackedFilesCount}</strong>
+                      </article>
+                    </div>
+                  ) : (
+                    <p className="git-empty">{gitStatus.message || "This folder is not a Git repository."}</p>
+                  )
+                ) : null}
+                {status.active && (diffViewer.isLoading || diffViewer.error || diffViewer.diff) ? (
+                  <div className="diff-viewer">
+                    <div className="diff-header">
+                      <h3>Current diff</h3>
+                      <div className="diff-actions">
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => {
+                            void copyLoadedDiff();
+                          }}
+                          disabled={!diffPanelText}
+                        >
+                          Copy diff
+                        </button>
+                      </div>
+                    </div>
+                    {diffViewer.isLoading ? <p className="git-empty">Loading diff...</p> : null}
+                    {!diffViewer.isLoading && diffViewer.error ? <p className="git-empty">{diffViewer.error}</p> : null}
+                    {!diffViewer.isLoading && !diffViewer.error && diffEmptyState ? (
+                      <p className="git-empty">{diffEmptyState}</p>
+                    ) : null}
+                    {!diffViewer.isLoading && !diffViewer.error && diffPanelText ? (
+                      <pre className="diff-panel">{diffPanelText}</pre>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="history-section rail-card">
+                <div className="section-heading">
+                  <div>
+                    <p className="section-kicker">History</p>
+                    <h2>Session history</h2>
+                  </div>
+                  <span className="section-chip">{sessions.length}</span>
+                </div>
+                <div className="history-list">
+                  {isLoadingSessions ? <p className="history-empty">Loading recent sessions...</p> : null}
+                  {!isLoadingSessions && sessions.length === 0 ? (
+                    <p className="history-empty">No saved sessions yet.</p>
+                  ) : null}
+                  {sessions.map((session) => (
+                    <article className="history-item" key={session.id}>
+                      <p className="history-repo">{session.repoPath}</p>
+                      <p className="history-meta">
+                        <span>{new Date(session.startTime).toLocaleString()}</span>
+                        <span>{formatDuration(session.durationMs)}</span>
+                      </p>
+                      <div className="history-actions">
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => {
+                            void viewTranscript(session);
+                          }}
+                        >
+                          View transcript
+                        </button>
+                      </div>
                     </article>
-                    <article className="git-stat-card">
-                      <span className="git-stat-label">Changed files</span>
-                      <strong>{gitStatus.changedFilesCount}</strong>
-                    </article>
-                    <article className="git-stat-card">
-                      <span className="git-stat-label">Staged files</span>
-                      <strong>{gitStatus.stagedFilesCount}</strong>
-                    </article>
-                    <article className="git-stat-card">
-                      <span className="git-stat-label">Untracked files</span>
-                      <strong>{gitStatus.untrackedFilesCount}</strong>
-                    </article>
+                  ))}
+                </div>
+                {transcriptViewer.session ? (
+                  <div className="transcript-viewer">
+                    <div className="transcript-header">
+                      <div>
+                        <h3>Transcript</h3>
+                        <p className="history-repo">{transcriptViewer.session.repoPath}</p>
+                        <p className="history-meta">
+                          <span>{new Date(transcriptViewer.session.startTime).toLocaleString()}</span>
+                          <span>
+                            {transcriptViewer.session.endTime
+                              ? new Date(transcriptViewer.session.endTime).toLocaleString()
+                              : "In progress"}
+                          </span>
+                          <span>{formatDuration(transcriptViewer.session.durationMs)}</span>
+                        </p>
+                      </div>
+                      <div className="transcript-actions">
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => {
+                            void copyLoadedTranscript();
+                          }}
+                          disabled={!transcriptViewer.transcript}
+                        >
+                          Copy transcript
+                        </button>
+                      </div>
+                    </div>
+                    {transcriptViewer.isLoading ? <p className="history-empty">Loading transcript...</p> : null}
+                    {!transcriptViewer.isLoading && transcriptViewer.error ? (
+                      <p className="history-empty">{transcriptViewer.error}</p>
+                    ) : null}
+                    {!transcriptViewer.isLoading && !transcriptViewer.error ? (
+                      <pre className="transcript-panel">{transcriptViewer.transcript || "Transcript is empty."}</pre>
+                    ) : null}
                   </div>
                 ) : (
-                  <p className="git-empty">{gitStatus.message || "This folder is not a Git repository."}</p>
-                )
-              ) : null}
-              {status.active && (diffViewer.isLoading || diffViewer.error || diffViewer.diff) ? (
-                <div className="diff-viewer">
-                  <div className="diff-header">
-                    <h3>Current diff</h3>
-                    <div className="diff-actions">
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => {
-                          void copyLoadedDiff();
-                        }}
-                        disabled={!diffPanelText}
-                      >
-                        Copy diff
-                      </button>
-                    </div>
+                  <div className="transcript-empty-state">
+                    <strong>Transcript viewer</strong>
+                    <p>Open any recent session to read its transcript here.</p>
                   </div>
-                  {diffViewer.isLoading ? <p className="git-empty">Loading diff...</p> : null}
-                  {!diffViewer.isLoading && diffViewer.error ? <p className="git-empty">{diffViewer.error}</p> : null}
-                  {!diffViewer.isLoading && !diffViewer.error && diffEmptyState ? (
-                    <p className="git-empty">{diffEmptyState}</p>
-                  ) : null}
-                  {!diffViewer.isLoading && !diffViewer.error && diffPanelText ? (
-                    <pre className="diff-panel">{diffPanelText}</pre>
-                  ) : null}
-                </div>
-              ) : null}
+                )}
+              </section>
             </aside>
           </div>
-
-          <section className="history-section">
-            <div className="history-header">
-              <h2>Recent sessions</h2>
-              <span>{sessions.length}</span>
-            </div>
-            <div className="history-list">
-              {isLoadingSessions ? <p className="history-empty">Loading recent sessions...</p> : null}
-              {!isLoadingSessions && sessions.length === 0 ? <p className="history-empty">No saved sessions yet.</p> : null}
-              {sessions.map((session) => (
-                <article className="history-item" key={session.id}>
-                  <p className="history-repo">{session.repoPath}</p>
-                  <p className="history-meta">
-                    <span>{new Date(session.startTime).toLocaleString()}</span>
-                    <span>{formatDuration(session.durationMs)}</span>
-                  </p>
-                  <div className="history-actions">
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => {
-                        void viewTranscript(session);
-                      }}
-                    >
-                      View transcript
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-            {transcriptViewer.session ? (
-              <div className="transcript-viewer">
-                <div className="transcript-header">
-                  <div>
-                    <h3>Transcript</h3>
-                    <p className="history-repo">{transcriptViewer.session.repoPath}</p>
-                    <p className="history-meta">
-                      <span>{new Date(transcriptViewer.session.startTime).toLocaleString()}</span>
-                      <span>
-                        {transcriptViewer.session.endTime
-                          ? new Date(transcriptViewer.session.endTime).toLocaleString()
-                          : "In progress"}
-                      </span>
-                      <span>{formatDuration(transcriptViewer.session.durationMs)}</span>
-                    </p>
-                  </div>
-                  <div className="transcript-actions">
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => {
-                        void copyLoadedTranscript();
-                      }}
-                      disabled={!transcriptViewer.transcript}
-                    >
-                      Copy transcript
-                    </button>
-                  </div>
-                </div>
-                {transcriptViewer.isLoading ? <p className="history-empty">Loading transcript...</p> : null}
-                {!transcriptViewer.isLoading && transcriptViewer.error ? (
-                  <p className="history-empty">{transcriptViewer.error}</p>
-                ) : null}
-                {!transcriptViewer.isLoading && !transcriptViewer.error ? (
-                  <pre className="transcript-panel">{transcriptViewer.transcript || "Transcript is empty."}</pre>
-                ) : null}
-              </div>
-            ) : null}
-          </section>
         </>
       ) : (
         <section className="settings-section">
