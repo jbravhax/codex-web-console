@@ -1,0 +1,109 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    command:
+      - bash
+      - -lc
+      - npm run dev:server & npm run dev:web
+    ports:
+      - "5173:5173"
+      - "8787:8787"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      VITE_HOST: 0.0.0.0
+      VITE_PORT: 5173
+      VITE_API_HOST: 127.0.0.1
+      VITE_API_PORT: 8787
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+      - codex_web_console_home:/root/.codex-web-console
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    command:
+      - bash
+      - -lc
+      - npm test
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      VITE_HOST: 0.0.0.0
+      VITE_PORT: 5173
+      VITE_API_HOST: 127.0.0.1
+      VITE_API_PORT: 8787
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+      - codex_web_console_home:/root/.codex-web-console
+    profiles:
+      - test
+
+  app-codex:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    command:
+      - bash
+      - -lc
+      - npm run dev:server & npm run dev:web
+    ports:
+      - "5174:5173"
+      - "8788:8787"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      CODEX_COMMAND: codex
+      VITE_HOST: 0.0.0.0
+      VITE_PORT: 5173
+      VITE_API_HOST: 127.0.0.1
+      VITE_API_PORT: 8787
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+      - codex_web_console_home:/root/.codex-web-console
+      - codex_home:/root/.codex
+    profiles:
+      - codex
+
+  codex-shell:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    command:
+      - bash
+      - -lc
+      - bash
+    stdin_open: true
+    tty: true
+    environment:
+      CODEX_COMMAND: codex
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+      - codex_web_console_home:/root/.codex-web-console
+      - codex_home:/root/.codex
+    profiles:
+      - codex
+
+volumes:
+  node_modules:
+  codex_web_console_home:
+  codex_home:

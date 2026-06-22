@@ -1,0 +1,24 @@
+{
+  "name": "codex-cli-web-console",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:server\"",
+    "dev:web": "npm run dev --workspace @codex-console/web",
+    "dev:server": "npm run dev --workspace @codex-console/server",
+    "build": "npm run build --workspace @codex-console/server && npm run build --workspace @codex-console/web",
+    "typecheck": "npm run typecheck --workspace @codex-console/server && npm run typecheck --workspace @codex-console/web",
+    "test": "npm run test --workspace @codex-console/server && npm run test --workspace @codex-console/web",
+    "docker:up": "docker compose up --build app",
+    "docker:test": "docker compose run --rm --profile test test",
+    "docker:codex": "docker compose --profile codex up --build app-codex",
+    "docker:codex:shell": "docker compose run --rm --profile codex codex-shell"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}
