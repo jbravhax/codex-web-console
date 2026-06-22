@@ -29,6 +29,11 @@ export type SessionErrorDisplay = {
   technicalDetail: string;
 };
 
+export type WebSocketCloseDisplay = {
+  detail: string;
+  technicalDetail: string;
+};
+
 function isFailurePayload(value: unknown): value is SessionFailurePayload {
   return (
     typeof value === "object" &&
@@ -59,6 +64,45 @@ export function buildUnexpectedExitDisplay(payload: SessionExitPayload): Session
   }
 
   return buildSessionErrorDisplay(payload.failure);
+}
+
+export function buildWebSocketCloseDisplay(
+  closeCode: number,
+  closeReason: string,
+  wasStopping: boolean
+): WebSocketCloseDisplay {
+  const normalizedReason = closeReason.trim().length > 0 ? closeReason.trim() : "No close reason was provided.";
+  const technicalDetail = `websocket connection closed with code ${closeCode}. Reason: ${normalizedReason}`;
+
+  if (wasStopping) {
+    return {
+      detail:
+        "The browser disconnected after the stop request. If Codex already finished stopping, start a fresh session when you are ready to continue.",
+      technicalDetail
+    };
+  }
+
+  if (closeCode === 1000) {
+    return {
+      detail:
+        "The live session disconnected cleanly from the local Codex server. If you refreshed the browser or navigated away, reopen the app and start a new session because live terminal reattach is not available yet.",
+      technicalDetail
+    };
+  }
+
+  if (closeCode === 1001) {
+    return {
+      detail:
+        "The live session connection ended because the browser page was closed, refreshed, or navigated away from. Reopen the app and start a new session to continue.",
+      technicalDetail
+    };
+  }
+
+  return {
+    detail:
+      "The live session disconnected from the local Codex server. If the local server stopped, restart it. Then reopen or refresh the browser and start a new session because this app does not resume a live terminal connection yet.",
+    technicalDetail
+  };
 }
 
 export function isStructuredSessionFailure(value: unknown): value is SessionFailurePayload {

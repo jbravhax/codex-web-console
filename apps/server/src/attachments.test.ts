@@ -430,6 +430,16 @@ describe("ZIP attachments", () => {
     expect(response.body.error).toContain("symlink");
   });
 
+  it("rejects invalid ZIP archives with a clearer message", async () => {
+    const repoPath = makeTempDir("codex-web-invalid-zip-");
+    fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
+
+    const response = await uploadBuffer(repoPath, Buffer.from("not a real zip archive"), "broken.zip", "application/zip");
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("valid .zip file");
+  });
+
   it("handles a large but legitimate source repository ZIP within limits", async () => {
     const repoPath = makeTempDir("codex-web-large-legit-zip-");
     fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");

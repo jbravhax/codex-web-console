@@ -2,15 +2,18 @@ export function stripTerminalSequences(input: string): string {
   let output = "";
   let currentLine: string[] = [];
   let cursor = 0;
+  let rewriteVisibleLength: number | null = null;
 
   const flushLine = (appendNewline: boolean) => {
-    output += currentLine.join("");
+    const visibleLength = rewriteVisibleLength === null ? currentLine.length : rewriteVisibleLength;
+    output += currentLine.slice(0, visibleLength).join("");
     if (appendNewline) {
       output += "\n";
     }
 
     currentLine = [];
     cursor = 0;
+    rewriteVisibleLength = null;
   };
 
   const writeVisibleCharacter = (character: string) => {
@@ -21,12 +24,16 @@ export function stripTerminalSequences(input: string): string {
     }
 
     cursor += 1;
+    if (rewriteVisibleLength !== null) {
+      rewriteVisibleLength = cursor;
+    }
   };
 
   const clearLine = (mode: 0 | 1 | 2) => {
     if (mode === 2) {
       currentLine = [];
       cursor = 0;
+      rewriteVisibleLength = 0;
       return;
     }
 
@@ -34,10 +41,17 @@ export function stripTerminalSequences(input: string): string {
       for (let index = 0; index < cursor; index += 1) {
         currentLine[index] = "";
       }
+
+      if (rewriteVisibleLength !== null) {
+        rewriteVisibleLength = currentLine.length;
+      }
       return;
     }
 
     currentLine = currentLine.slice(0, cursor);
+    if (rewriteVisibleLength !== null) {
+      rewriteVisibleLength = cursor;
+    }
   };
 
   const moveCursorHorizontally = (position: number) => {
@@ -133,6 +147,7 @@ export function stripTerminalSequences(input: string): string {
       }
 
       cursor = 0;
+      rewriteVisibleLength = currentLine.length;
       index += 1;
       continue;
     }
@@ -159,7 +174,8 @@ export function stripTerminalSequences(input: string): string {
   }
 
   if (currentLine.length > 0) {
-    output += currentLine.join("");
+    const visibleLength = rewriteVisibleLength === null ? currentLine.length : rewriteVisibleLength;
+    output += currentLine.slice(0, visibleLength).join("");
   }
 
   return output;

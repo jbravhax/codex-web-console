@@ -135,6 +135,22 @@ describe("SessionManager", () => {
     expect(manager.getRawTranscript(session.sessionId)).toBe("\u001b[31mError\u001b[39m\n\u001b[2J\u001b[1;1HCreated README.md");
   });
 
+  it("stores the final shortened line when terminal redraw output uses carriage returns", () => {
+    const repoPath = makeProjectDir("codex-web-session-");
+    createdProjectPaths.push(repoPath);
+    const fakePty = new FakePtyProcess();
+    spawnMock.mockReturnValue(fakePty);
+    const manager = new SessionManager(() => makeConfig());
+    managersToCleanup.push(manager);
+
+    const session = manager.start("owner-redraw-transcript", repoPath);
+    manager.appendOutput("owner-redraw-transcript", "Processing 100%\rDone\n");
+    manager.clear("owner-redraw-transcript");
+
+    expect(fs.readFileSync(session.transcriptPath, "utf8")).toBe("Done\n");
+    expect(manager.getTranscript(session.sessionId)).toBe("Done\n");
+  });
+
   it("ignores transcript writes after a session is cleared", () => {
     const repoPath = makeProjectDir("codex-web-session-");
     createdProjectPaths.push(repoPath);

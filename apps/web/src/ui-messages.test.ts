@@ -18,6 +18,9 @@ describe("friendlyUploadErrorMessage", () => {
     expect(friendlyUploadErrorMessage("ZIP contains a symlink entry, which is not allowed.")).toContain(
       "contains symlinks"
     );
+    expect(
+      friendlyUploadErrorMessage("Could not read ZIP archive. Make sure it is a valid .zip file and try again.")
+    ).toContain("valid ZIP archive");
   });
 
   it("maps session-required errors to clearer guidance", () => {

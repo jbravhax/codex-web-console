@@ -439,9 +439,11 @@ Do not expose this app to untrusted users.
 - No multi-project dashboard
 - No transcript search UI yet
 - Approval guidance is improved, but confirmation still happens in the Codex terminal flow
+- No live session reattach after a browser refresh or websocket disconnect yet; reopen the app and start a new session
 - Git status is summary-only
 - Host and port changes require restarting the backend
 - The app assumes Linux usage even though parts of the codebase are cross-platform
+- The upload path is intentionally isolated, but `multer` 1.x remains a deferred dependency follow-up until a clean 2.x install pass is completed
 
 ## Troubleshooting
 

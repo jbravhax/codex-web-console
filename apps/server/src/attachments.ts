@@ -145,6 +145,8 @@ const ZIP_LIMITS: ZipExtractionLimits = {
   maxSingleExtractedFileBytes: MAX_SINGLE_EXTRACTED_FILE_BYTES
 };
 
+const INVALID_ZIP_ARCHIVE_MESSAGE = "Could not read ZIP archive. Make sure it is a valid .zip file and try again.";
+
 function createAttachmentId(): string {
   return `attachment-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -262,7 +264,7 @@ async function extractZipContents(
   const zipFile = await new Promise<yauzl.ZipFile>((resolve, reject) => {
     yauzl.fromBuffer(zipBuffer, { lazyEntries: true, decodeStrings: true, validateEntrySizes: true }, (error, file) => {
       if (error || !file) {
-        reject(error ?? new Error("Could not read ZIP archive."));
+        reject(new Error(INVALID_ZIP_ARCHIVE_MESSAGE));
         return;
       }
 

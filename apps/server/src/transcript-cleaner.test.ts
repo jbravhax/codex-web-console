@@ -26,6 +26,10 @@ describe("stripTerminalSequences", () => {
     expect(stripTerminalSequences("Progress 10%\rProgress 90%\rProgress 100%\nDone")).toBe("Progress 100%\nDone");
   });
 
+  it("drops stale tail text when a carriage-return rewrite becomes shorter", () => {
+    expect(stripTerminalSequences("Processing 100%\rDone\nNext")).toBe("Done\nNext");
+  });
+
   it("drops partial trailing control sequences without stripping meaningful text", () => {
     expect(stripTerminalSequences("Ready\u001b[31")).toBe("Ready");
     expect(stripTerminalSequences("Title\u001b]0;Codex")).toBe("Title");
@@ -41,5 +45,9 @@ describe("stripTerminalSequences", () => {
 
   it("preserves partial visible lines while stripping surrounding control characters", () => {
     expect(stripTerminalSequences("step 1\r\n\u0000step 2\tok\r")).toBe("step 1\nstep 2\tok");
+  });
+
+  it("handles progress redraw lines mixed with cursor resets and shorter final labels", () => {
+    expect(stripTerminalSequences("Uploading 100%\r\u001b[2KReady\n")).toBe("Ready\n");
   });
 });

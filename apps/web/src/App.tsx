@@ -67,7 +67,12 @@ import {
   loadSessionTranscript
 } from "./session-transcripts";
 import { buildSubmittedPromptInput, detectTerminalOutputState } from "./terminal-session";
-import { buildSessionErrorDisplay, buildUnexpectedExitDisplay, isStructuredSessionFailure } from "./session-diagnostics";
+import {
+  buildSessionErrorDisplay,
+  buildUnexpectedExitDisplay,
+  buildWebSocketCloseDisplay,
+  isStructuredSessionFailure
+} from "./session-diagnostics";
 import { friendlyUploadErrorMessage } from "./ui-messages";
 import { loadReadiness } from "./readiness";
 
@@ -581,10 +586,7 @@ export function App() {
         ? closeEvent.reason.trim()
         : "No close reason was provided.";
       const wasStopping = sessionBannerRef.current.state === "stopping" || sessionBannerRef.current.state === "stopped";
-      const detail =
-        closeCode === 1000
-          ? "The live session disconnected cleanly from the local Codex server."
-          : "The live session disconnected from the local Codex server. If the server stopped, restart it. Then open a new session and try again.";
+      const closeDisplay = buildWebSocketCloseDisplay(closeCode, closeReason, wasStopping);
       if (!wasStopping) {
         setSessionActivity((current) => ({
           ...current,
@@ -592,8 +594,8 @@ export function App() {
           disconnectedAt: closeTimestamp
         }));
       }
-      setSessionBanner((current) => reduceSessionBanner(current, { type: "websocket-close", detail }));
-      setError(`${detail}\nTechnical details: websocket connection closed with code ${closeCode}. Reason: ${closeReason}`);
+      setSessionBanner((current) => reduceSessionBanner(current, { type: "websocket-close", detail: closeDisplay.detail }));
+      setError(`${closeDisplay.detail}\nTechnical details: ${closeDisplay.technicalDetail}`);
     };
 
     socketRef.current = socket;

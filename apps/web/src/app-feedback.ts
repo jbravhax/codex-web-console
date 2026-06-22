@@ -47,5 +47,9 @@ export function buildZipUploadSuccessMessage(attachment: Extract<PendingAttachme
       ? ` ${attachment.skippedFileCount.toLocaleString()} file${attachment.skippedFileCount === 1 ? " was" : "s were"} skipped because ${attachment.skippedFileCount === 1 ? "it was" : "they were"} not reviewable here or would have been unsafe to extract.`
       : "";
 
+  if (attachment.extractedFileCount === 0) {
+    return `Uploaded ${attachment.fileName}. No reviewable files were extracted into ${attachment.extractedFolderRelativePath}/, so Codex will not have useful file content to inspect there yet.${skippedSummary} Rebuild the ZIP from the specific source or project files you want reviewed, then upload it again.`;
+  }
+
   return `Uploaded ${attachment.fileName}. Accepted ${attachment.extractedFileCount.toLocaleString()} reviewable file${attachment.extractedFileCount === 1 ? "" : "s"} into ${attachment.extractedFolderRelativePath}/ for Codex to inspect.${skippedSummary} If this ZIP was meant to be a whole codebase review, focus Codex on the extracted folder path rather than the original archive.`;
 }

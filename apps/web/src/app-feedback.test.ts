@@ -65,6 +65,18 @@ describe("app feedback helpers", () => {
     expect(buildZipUploadSuccessMessage(zipAttachment)).toContain("focus Codex on the extracted folder path");
   });
 
+  it("explains when a ZIP uploads successfully but contains no reviewable extracted files", () => {
+    expect(
+      buildZipUploadSuccessMessage({
+        ...zipAttachment,
+        extractedFileCount: 0,
+        extractedFiles: [],
+        treePreview: [],
+        skippedFileCount: 5
+      })
+    ).toContain("No reviewable files were extracted");
+  });
+
   it("builds a large-paste success message with threshold guidance", () => {
     expect(buildLargePasteSavedMessage(".codex-web/documents/example.md", 12_345)).toContain("12,345 characters");
     expect(buildLargePasteSavedMessage(".codex-web/documents/example.md", 12_345)).toContain(

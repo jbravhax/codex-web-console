@@ -500,6 +500,13 @@ describe("App integration", () => {
     socket.emitClose({ code: 1006, reason: "server stopped" });
     expect(await screen.findByText("Disconnected")).toBeTruthy();
     expect(await screen.findByText("Disconnected at")).toBeTruthy();
+    expect(
+      (
+        await screen.findAllByText(
+          /start a new session because this app does not resume a live terminal connection yet/i
+        )
+      ).length
+    ).toBeGreaterThan(0);
     expect(await screen.findByText(/Technical details: websocket connection closed with code 1006. Reason: server stopped/i)).toBeTruthy();
   });
 

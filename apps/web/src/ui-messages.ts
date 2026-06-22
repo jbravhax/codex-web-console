@@ -82,6 +82,10 @@ export function friendlyUploadErrorMessage(message: string): string {
     return "Could not finish the ZIP upload. The archive contains symlinks, which are blocked for safety. Re-create the ZIP with regular files only and try again.";
   }
 
+  if (normalizedMessage.includes("valid .zip file")) {
+    return "Could not finish the ZIP upload. This file could not be read as a valid ZIP archive. Re-create the archive from the project folder and try again.";
+  }
+
   if (normalizedMessage.includes("too many extractable files")) {
     return "Could not finish the ZIP upload. The archive contains more than 2,000 reviewable files. Split it into smaller parts or narrow it to the area you want Codex to inspect.";
   }
