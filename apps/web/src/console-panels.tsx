@@ -44,7 +44,7 @@ function formatZipSkipReason(reason: string): string {
 
 function buildTerminalGuidance(sessionBanner: SessionBanner): string | null {
   if (sessionBanner.state === "awaiting-approval") {
-    return "Codex is paused for approval. Read the request in the terminal, approve it there with Enter or cancel with Esc, and Codex will continue automatically afterward.";
+    return "Codex is waiting for approval in the terminal. Approve in the terminal and work will continue automatically. Press Enter there to approve or Esc to cancel.";
   }
 
   if (sessionBanner.state === "awaiting-input") {
@@ -62,7 +62,51 @@ function buildTerminalGuidance(sessionBanner: SessionBanner): string | null {
   return null;
 }
 
-export function ConsoleHeader({ activeView, onChangeView, sessionBanner }: ConsoleHeaderProps) {
+function formatTimestamp(timestamp: string | null): string | null {
+  if (!timestamp) {
+    return null;
+  }
+
+  return new Date(timestamp).toLocaleString();
+}
+
+function buildSessionMomentRows(
+  sessionBanner: SessionBanner,
+  sessionActivity: ConsoleHeaderProps["sessionActivity"]
+): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [];
+
+  const startedAt = formatTimestamp(sessionActivity.startedAt);
+  if (startedAt && sessionBanner.state !== "idle" && sessionBanner.state !== "connecting") {
+    rows.push({ label: "Started at", value: startedAt });
+  }
+
+  const lastActivityAt = formatTimestamp(sessionActivity.lastActivityAt);
+  if (lastActivityAt && sessionBanner.state !== "idle" && sessionBanner.state !== "connecting") {
+    rows.push({ label: "Last activity", value: lastActivityAt });
+  }
+
+  const completedAt = formatTimestamp(sessionActivity.completedAt);
+  if (completedAt && sessionBanner.state === "completed") {
+    rows.push({ label: "Completed at", value: completedAt });
+  }
+
+  const disconnectedAt = formatTimestamp(sessionActivity.disconnectedAt);
+  if (disconnectedAt && sessionBanner.state === "disconnected") {
+    rows.push({ label: "Disconnected at", value: disconnectedAt });
+  }
+
+  const failedAt = formatTimestamp(sessionActivity.failedAt);
+  if (failedAt && sessionBanner.state === "failed") {
+    rows.push({ label: "Failed at", value: failedAt });
+  }
+
+  return rows;
+}
+
+export function ConsoleHeader({ activeView, onChangeView, sessionBanner, sessionActivity }: ConsoleHeaderProps) {
+  const sessionMoments = buildSessionMomentRows(sessionBanner, sessionActivity);
+
   return (
     <>
       <header className="page-header">
@@ -95,6 +139,16 @@ export function ConsoleHeader({ activeView, onChangeView, sessionBanner }: Conso
         <div className="session-banner-copy">
           <strong>{sessionBanner.title}</strong>
           <p>{sessionBanner.detail}</p>
+          {sessionMoments.length > 0 ? (
+            <div className="session-banner-metadata">
+              {sessionMoments.map((row) => (
+                <span key={row.label} className="session-banner-metadata-item">
+                  <span className="session-banner-metadata-label">{row.label}</span>
+                  <strong>{row.value}</strong>
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <span className="session-banner-state">{formatSessionBannerStateLabel(sessionBanner.state)}</span>
       </section>
@@ -716,9 +770,11 @@ export function ConsoleView({
   sessionHistoryPanel,
   status,
   sessionBanner,
+  sessionActivity,
   terminalContainerRef
 }: ConsoleViewProps) {
   const terminalGuidance = buildTerminalGuidance(sessionBanner);
+  const sessionMoments = buildSessionMomentRows(sessionBanner, sessionActivity);
 
   return (
     <div className="console-layout">
@@ -731,17 +787,33 @@ export function ConsoleView({
         <ComposerPanel {...composerPanel} />
 
         <section className="terminal-section workspace-card">
-          <div className="terminal-stage-header">
+          <div
+            className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
+              sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
+            }`}
+            data-session-state={sessionBanner.state}
+          >
+            <div className="terminal-stage-header">
             <div>
               <p className="section-kicker">Console</p>
               <h2>Live Codex terminal</h2>
             </div>
-          <div className="terminal-stage-meta">
+            <div className="terminal-stage-meta">
               <span className="section-chip">{status.active ? formatSessionBannerStateLabel(sessionBanner.state) : "Waiting"}</span>
+              {sessionMoments.length > 0 ? (
+                <div className="terminal-stage-metadata">
+                  {sessionMoments.map((row) => (
+                    <span key={row.label}>
+                      <strong>{row.label}:</strong> {row.value}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
-        </div>
-          {terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
-          <div ref={terminalContainerRef} className="terminal-panel" />
+            {terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
+            <div ref={terminalContainerRef} className="terminal-panel" />
+          </div>
         </section>
       </main>
 

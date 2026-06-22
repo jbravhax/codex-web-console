@@ -12,6 +12,14 @@ export type SessionStatus = {
   startedAt: string | null;
 };
 
+export type SessionActivitySummary = {
+  startedAt: string | null;
+  lastActivityAt: string | null;
+  completedAt: string | null;
+  disconnectedAt: string | null;
+  failedAt: string | null;
+};
+
 export type CreateProjectOptions = {
   createFolder: boolean;
   initializeGit: boolean;
@@ -160,6 +168,7 @@ export type ConsoleViewProps = {
   sessionHistoryPanel: SessionHistoryPanelProps;
   status: SessionStatus;
   sessionBanner: SessionBanner;
+  sessionActivity: SessionActivitySummary;
   terminalContainerRef: React.RefObject<HTMLDivElement | null>;
 };
 
@@ -167,4 +176,5 @@ export type ConsoleHeaderProps = {
   activeView: "console" | "settings";
   onChangeView(nextView: "console" | "settings"): void;
   sessionBanner: SessionBanner;
+  sessionActivity: SessionActivitySummary;
 };

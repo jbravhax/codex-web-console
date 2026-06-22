@@ -279,6 +279,7 @@ describe("App integration", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Start session" }));
     expect(screen.getByText("Starting session")).toBeTruthy();
+    expect(await screen.findByText("Started at")).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
     expect(await screen.findByText("Session running")).toBeTruthy();
@@ -338,8 +339,9 @@ describe("App integration", () => {
       type: "output",
       payload: "Would you like to run the following command?\nPress enter to confirm"
     });
-    expect(await screen.findByText("Approval needed")).toBeTruthy();
-    expect(screen.getAllByText(/approve it there with Enter or cancel with Esc/i).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Waiting for approval")).toBeTruthy();
+    expect(screen.getAllByText(/approve in the terminal and work will continue automatically/i).length).toBeGreaterThan(0);
+    expect(document.querySelector('[data-session-state="awaiting-approval"]')).toBeTruthy();
 
     socket.emitMessage({
       type: "output",
@@ -364,10 +366,12 @@ describe("App integration", () => {
       payload: "Created only README.md.\n\n─ Worked for 1m 23s ─"
     });
     expect(await screen.findByText("Request completed")).toBeTruthy();
+    expect(await screen.findByText("Completed at")).toBeTruthy();
     expect(screen.getAllByText(/send another prompt when you're ready/i).length).toBeGreaterThan(0);
 
     socket.emitClose({ code: 1006, reason: "server stopped" });
     expect(await screen.findByText("Disconnected")).toBeTruthy();
+    expect(await screen.findByText("Disconnected at")).toBeTruthy();
     expect(await screen.findByText(/Technical details: websocket connection closed with code 1006. Reason: server stopped/i)).toBeTruthy();
   });
 
@@ -482,6 +486,8 @@ describe("App integration", () => {
     });
 
     expect(await screen.findByText("Session completed")).toBeTruthy();
+    expect(await screen.findByText("Completed at")).toBeTruthy();
+    expect(await screen.findByText("Last activity")).toBeTruthy();
   });
 
   it("shows an empty preview state when nothing is queued", async () => {

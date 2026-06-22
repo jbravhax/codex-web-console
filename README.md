@@ -17,6 +17,7 @@ All of these inputs appear together in one pending-context area in the UI so you
 - A local web console for the official Codex CLI
 - A wrapper that runs Codex as a normal local terminal process
 - A browser UI for starting a session, sending input, and viewing output
+- A browser UI that keeps session state visible, including approval waits, completion, disconnects, and failures
 - A local-only tool intended to run on the same Linux machine as Codex
 - A small TypeScript monorepo with a React frontend and Express backend
 

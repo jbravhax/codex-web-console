@@ -19,6 +19,7 @@ import type {
   GitStatusSummary,
   RecentProjectItem,
   ServerMessage,
+  SessionActivitySummary,
   SessionHistoryItem,
   SessionStatus,
   ThemeSetting,
@@ -118,6 +119,7 @@ export function App() {
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const statusRef = useRef<SessionStatus>({ active: false, repoPath: null, startedAt: null });
+  const sessionBannerRef = useRef<SessionBanner>(createInitialSessionBanner());
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [activeView, setActiveView] = useState<"console" | "settings">("console");
   const [repoPath, setRepoPath] = useState("");
@@ -157,6 +159,13 @@ export function App() {
   const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "disconnected">(
     "connecting"
   );
+  const [sessionActivity, setSessionActivity] = useState<SessionActivitySummary>({
+    startedAt: null,
+    lastActivityAt: null,
+    completedAt: null,
+    disconnectedAt: null,
+    failedAt: null
+  });
 
   const readyPendingItemCount = countReadyPendingContextItems(pendingContextItems);
   const pendingContextPreviewLines = buildPendingContextPreview(pendingContextItems);
@@ -183,6 +192,10 @@ export function App() {
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
+
+  useEffect(() => {
+    sessionBannerRef.current = sessionBanner;
+  }, [sessionBanner]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
@@ -357,6 +370,15 @@ export function App() {
 
       if (message.type === "status") {
         setStatus(message.payload);
+        if (message.payload.active) {
+          setSessionActivity((current) => ({
+            startedAt: message.payload.startedAt ?? current.startedAt,
+            lastActivityAt: current.lastActivityAt ?? message.payload.startedAt ?? new Date().toISOString(),
+            completedAt: null,
+            disconnectedAt: null,
+            failedAt: null
+          }));
+        }
         setSessionBanner((current) =>
           reduceSessionBanner(current, {
             type: "status-received",
@@ -376,6 +398,14 @@ export function App() {
       if (message.type === "output") {
         terminalRef.current?.write(message.payload);
         const outputState = detectTerminalOutputState(message.payload);
+        const activityTimestamp = new Date().toISOString();
+        setSessionActivity((current) => ({
+          ...current,
+          lastActivityAt: activityTimestamp,
+          completedAt: outputState === "completed" ? activityTimestamp : null,
+          disconnectedAt: null,
+          failedAt: null
+        }));
         if (outputState === "approval") {
           setSessionBanner((current) => reduceSessionBanner(current, { type: "waiting-for-approval" }));
         } else if (outputState === "awaiting-input") {
@@ -397,6 +427,15 @@ export function App() {
       if (message.type === "exit") {
         setStatus((current) => ({ active: false, repoPath: current.repoPath, startedAt: null }));
         const exitDisplay = buildUnexpectedExitDisplay(message.payload);
+        const exitTimestamp = message.payload.endedAt ?? new Date().toISOString();
+        const wasStopping = sessionBannerRef.current.state === "stopping" || sessionBannerRef.current.state === "stopped";
+        setSessionActivity((current) => ({
+          startedAt: message.payload.startedAt ?? current.startedAt,
+          lastActivityAt: exitTimestamp,
+          completedAt: !exitDisplay && message.payload.exitCode === 0 && !wasStopping ? exitTimestamp : null,
+          disconnectedAt: null,
+          failedAt: exitDisplay ? exitTimestamp : null
+        }));
         if (exitDisplay) {
           setError(`${exitDisplay.detail}\nTechnical details: ${exitDisplay.technicalDetail}`);
         }
@@ -419,6 +458,7 @@ export function App() {
       }
 
       if (message.type === "error") {
+        const failureTimestamp = new Date().toISOString();
         const sessionDisplay = isStructuredSessionFailure(message.payload)
           ? buildSessionErrorDisplay(message.payload)
           : {
@@ -433,6 +473,12 @@ export function App() {
         setSessionBanner((current) =>
           reduceSessionBanner(current, { type: "error-received", detail: sessionDisplay.detail })
         );
+        setSessionActivity((current) => ({
+          ...current,
+          lastActivityAt: failureTimestamp,
+          failedAt: failureTimestamp,
+          disconnectedAt: null
+        }));
         terminalRef.current?.writeln("");
         terminalRef.current?.writeln(
           `[error] ${typeof message.payload === "string" ? message.payload : message.payload.technicalDetail}`
@@ -443,14 +489,23 @@ export function App() {
     socket.onclose = (closeEvent) => {
       setConnectionState("disconnected");
       setStatus((current) => ({ active: false, repoPath: current.repoPath, startedAt: null }));
+      const closeTimestamp = new Date().toISOString();
       const closeCode = typeof closeEvent?.code === "number" ? closeEvent.code : 1006;
       const closeReason = typeof closeEvent?.reason === "string" && closeEvent.reason.trim().length > 0
         ? closeEvent.reason.trim()
         : "No close reason was provided.";
+      const wasStopping = sessionBannerRef.current.state === "stopping" || sessionBannerRef.current.state === "stopped";
       const detail =
         closeCode === 1000
           ? "The live session disconnected cleanly from the local Codex server."
           : "The live session disconnected from the local Codex server. If the server stopped, restart it. Then open a new session and try again.";
+      if (!wasStopping) {
+        setSessionActivity((current) => ({
+          ...current,
+          lastActivityAt: closeTimestamp,
+          disconnectedAt: closeTimestamp
+        }));
+      }
       setSessionBanner((current) => reduceSessionBanner(current, { type: "websocket-close", detail }));
       setError(`${detail}\nTechnical details: websocket connection closed with code ${closeCode}. Reason: ${closeReason}`);
     };
@@ -472,6 +527,14 @@ export function App() {
 
     setError("");
     setContextMessage("");
+    const activityTimestamp = new Date().toISOString();
+    setSessionActivity({
+      startedAt: activityTimestamp,
+      lastActivityAt: activityTimestamp,
+      completedAt: null,
+      disconnectedAt: null,
+      failedAt: null
+    });
     setSessionBanner((current) => reduceSessionBanner(current, { type: "start-requested", repoPath }));
     terminalRef.current?.clear();
     socketRef.current?.send(
@@ -496,6 +559,12 @@ export function App() {
   const stopSession = () => {
     setError("");
     setContextMessage("");
+    setSessionActivity((current) => ({
+      ...current,
+      lastActivityAt: new Date().toISOString(),
+      completedAt: null,
+      disconnectedAt: null
+    }));
     setSessionBanner((current) => reduceSessionBanner(current, { type: "stop-requested" }));
     socketRef.current?.send(JSON.stringify({ type: "stop" }));
   };
@@ -845,6 +914,13 @@ export function App() {
 
     setError("");
     setContextMessage("");
+    setSessionActivity((current) => ({
+      ...current,
+      lastActivityAt: new Date().toISOString(),
+      completedAt: null,
+      disconnectedAt: null,
+      failedAt: null
+    }));
     socketRef.current?.send(JSON.stringify({ type: "input", data: buildSubmittedPromptInput(composedPrompt) }));
     setSessionBanner((current) => reduceSessionBanner(current, { type: "prompt-submitted" }));
     terminalRef.current?.writeln(`\n[web prompt sent]\n${composedPrompt}\n`);
@@ -992,7 +1068,12 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <ConsoleHeader activeView={activeView} onChangeView={setActiveView} sessionBanner={sessionBanner} />
+      <ConsoleHeader
+        activeView={activeView}
+        onChangeView={setActiveView}
+        sessionBanner={sessionBanner}
+        sessionActivity={sessionActivity}
+      />
 
       {activeView === "console" ? (
         <ConsoleView
@@ -1082,6 +1163,7 @@ export function App() {
           }}
           status={status}
           sessionBanner={sessionBanner}
+          sessionActivity={sessionActivity}
           terminalContainerRef={terminalContainerRef}
         />
       ) : (

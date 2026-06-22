@@ -107,9 +107,9 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
   if (event.type === "waiting-for-approval") {
     return {
       state: "awaiting-approval",
-      title: "Approval needed",
+      title: "Waiting for approval",
       detail:
-        "Codex paused for approval. Review the request in the terminal below, then press Enter there to approve or Esc to cancel. After approval, Codex will continue automatically."
+        "Codex is waiting for approval in the terminal. Approve in the terminal and work will continue automatically. Press Enter there to approve or Esc to cancel."
     };
   }
 
@@ -158,7 +158,7 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
       return {
         state: "stopped",
         title: "Session stopped",
-        detail: `Codex exited with code ${event.exitCode} and signal ${event.signal}.`
+        detail: `The stop request finished and Codex exited with code ${event.exitCode} and signal ${event.signal}.`
       };
     }
 
@@ -166,7 +166,7 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
       return {
         state: "completed",
         title: "Session completed",
-        detail: "Codex exited cleanly after finishing the session."
+        detail: "Codex exited cleanly after finishing the session. Review the terminal output or send another prompt when you're ready."
       };
     }
 
@@ -182,7 +182,7 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
       return {
         state: "stopped",
         title: "Session stopped",
-        detail: event.detail
+        detail: `The browser disconnected after the stop request. ${event.detail}`
       };
     }
 

@@ -44,9 +44,9 @@ describe("session banner state", () => {
     });
     expect(waitingForApproval).toEqual({
       state: "awaiting-approval",
-      title: "Approval needed",
+      title: "Waiting for approval",
       detail:
-        "Codex paused for approval. Review the request in the terminal below, then press Enter there to approve or Esc to cancel. After approval, Codex will continue automatically."
+        "Codex is waiting for approval in the terminal. Approve in the terminal and work will continue automatically. Press Enter there to approve or Esc to cancel."
     });
   });
 
@@ -98,6 +98,7 @@ describe("session banner state", () => {
 
     expect(stopping.state).toBe("stopping");
     expect(stopped.state).toBe("stopped");
+    expect(stopped.detail).toContain("stop request finished");
     expect(afterStatus).toEqual(stopped);
   });
 
