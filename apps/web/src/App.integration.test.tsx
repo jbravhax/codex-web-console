@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import * as clipboardModule from "./clipboard";
@@ -273,10 +273,10 @@ describe("App integration", () => {
 
     renderApp();
 
-    fireEvent.click(screen.getByRole("button", { name: "Use browser picker" }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose folder" }));
 
     expect(await screen.findByText(REPO_PICKER_UNSUPPORTED_MESSAGE)).toBeTruthy();
-    expect(screen.getByText(/Manual path entry is fully supported and remains the primary way/i)).toBeTruthy();
+    expect(screen.getByText(/Manual entry is the primary path/i)).toBeTruthy();
   });
 
   it("shows environment readiness details for the selected project", async () => {
@@ -323,7 +323,13 @@ describe("App integration", () => {
       }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Create new project" }));
+    const createProjectSection = screen.getByText("Create new project").closest("section");
+    if (!createProjectSection) {
+      throw new Error("Expected create-project section.");
+    }
+
+    fireEvent.click(within(createProjectSection).getByRole("button", { name: "Show" }));
+    fireEvent.click(within(createProjectSection).getByRole("button", { name: "Create new project" }));
 
     expect(await screen.findByText(/Project created at \/workspace\/new-project/i)).toBeTruthy();
     expect((screen.getByLabelText("Project folder path") as HTMLInputElement).value).toBe("/workspace/new-project");
@@ -531,10 +537,39 @@ describe("App integration", () => {
       }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Create new project" }));
+    const createProjectSection = screen.getByText("Create new project").closest("section");
+    if (!createProjectSection) {
+      throw new Error("Expected create-project section.");
+    }
+
+    fireEvent.click(within(createProjectSection).getByRole("button", { name: "Show" }));
+    fireEvent.click(within(createProjectSection).getByRole("button", { name: "Create new project" }));
 
     expect(await screen.findByText(/already exists and is not empty/i)).toBeTruthy();
     expect((screen.getByLabelText("Project folder path") as HTMLInputElement).value).toBe("/workspace/existing-project");
+  });
+
+  it("keeps lower-frequency project setup tools collapsed until needed", async () => {
+    renderApp();
+
+    expect(screen.queryByText("Initialize Git repository")).toBeNull();
+    expect(screen.queryByText("Open a project once and it will appear here for quick reuse.")).toBeNull();
+
+    const createProjectSection = screen.getByText("Create new project").closest("section");
+    if (!createProjectSection) {
+      throw new Error("Expected create-project section.");
+    }
+
+    fireEvent.click(within(createProjectSection).getByRole("button", { name: "Show" }));
+    expect(await screen.findByText("Initialize Git repository")).toBeTruthy();
+
+    const recentProjectsSection = screen.getByText("Recent projects").closest("section");
+    if (!recentProjectsSection) {
+      throw new Error("Expected recent-projects section.");
+    }
+
+    fireEvent.click(within(recentProjectsSection).getByRole("button", { name: "Show" }));
+    expect(await screen.findByText("Open a project once and it will appear here for quick reuse.")).toBeTruthy();
   });
 
   it("shows clear guidance when the selected folder looks like a broad parent directory", async () => {
@@ -713,6 +748,38 @@ describe("App integration", () => {
 
     fireEvent.click(transcriptButtons[1]);
     expect(await screen.findByText("Session transcript not found.")).toBeTruthy();
+  });
+
+  it("keeps transcript export actions available without leaving them always expanded", async () => {
+    vi.mocked(loadSessionTranscript).mockResolvedValueOnce("session transcript text");
+
+    renderApp({
+      sessions: {
+        items: [
+          {
+            id: "session-1",
+            repoPath: "/workspace/project-one",
+            startTime: "2026-06-21T12:00:00.000Z",
+            endTime: "2026-06-21T12:02:00.000Z",
+            durationMs: 120000
+          }
+        ]
+      }
+    });
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
+    await screen.findByText("session transcript text");
+
+    expect(screen.queryByRole("button", { name: "Download .txt" })).toBeNull();
+
+    const exportSection = screen.getByText("Export options").closest("section");
+    if (!exportSection) {
+      throw new Error("Expected transcript export section.");
+    }
+
+    fireEvent.click(within(exportSection).getByRole("button", { name: "Show" }));
+    expect(await screen.findByRole("button", { name: "Download .txt" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Download raw" })).toBeTruthy();
   });
 
   it("shows a fallback success message when copy uses the browser fallback", async () => {

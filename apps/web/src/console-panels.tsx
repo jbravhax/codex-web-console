@@ -1,3 +1,4 @@
+import { type ReactNode, useEffect, useState } from "react";
 import { formatAttachmentSize } from "./attachments";
 import type {
   ComposerPanelProps,
@@ -115,6 +116,38 @@ function buildSessionMomentRows(
   return rows;
 }
 
+type CollapsibleSectionProps = {
+  title: string;
+  subtitle?: string;
+  defaultExpanded?: boolean;
+  children: ReactNode;
+};
+
+function CollapsibleSection({ title, subtitle, defaultExpanded = false, children }: CollapsibleSectionProps) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  useEffect(() => {
+    if (defaultExpanded) {
+      setIsExpanded(true);
+    }
+  }, [defaultExpanded]);
+
+  return (
+    <section className={`collapsible-section ${isExpanded ? "expanded" : ""}`}>
+      <div className="collapsible-section-header">
+        <div>
+          <strong>{title}</strong>
+          {subtitle ? <p className="helper-text collapsible-section-subtitle">{subtitle}</p> : null}
+        </div>
+        <button type="button" className="ghost collapsible-toggle" onClick={() => setIsExpanded((current) => !current)}>
+          {isExpanded ? "Hide" : "Show"}
+        </button>
+      </div>
+      {isExpanded ? <div className="collapsible-section-body">{children}</div> : null}
+    </section>
+  );
+}
+
 export function ConsoleHeader({ activeView, onChangeView, sessionBanner, sessionActivity }: ConsoleHeaderProps) {
   const sessionMoments = buildSessionMomentRows(sessionBanner, sessionActivity);
 
@@ -189,6 +222,8 @@ export function ProjectControls({
   recentProjects,
   isLoadingRecentProjects
 }: ProjectControlsProps) {
+  const readinessHasPriorityState = isLoadingReadiness || readiness?.overallStatus === "warning" || readiness?.overallStatus === "failed";
+
   return (
     <section className="controls rail-card">
       <div className="section-heading">
@@ -208,107 +243,120 @@ export function ProjectControls({
           placeholder={defaultRepoRoot || "/home/you/project"}
         />
         <button type="button" className="secondary" onClick={onChooseRepo}>
-          Use browser picker
+          Choose folder
         </button>
       </div>
       <p className="helper-text">
-        Best results come from pasting the full path to one real project folder here. Manual path entry is fully supported and remains the primary way to choose a project.
-      </p>
-      <p className="helper-text">
-        Good examples: `/home/you/my-app` or `/home/you/projects/api-service`. Avoid broad parent folders like `/home/you/Projects`. The browser picker is only a convenience, and some browsers cannot share a usable absolute path from it.
+        Paste one real project folder path here. Manual entry is the primary path, and the browser folder picker is only a convenience because some browsers cannot share a usable absolute path.
       </p>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
-      <div className="readiness-card">
-        <div className="readiness-card-header">
-          <div>
-            <strong>Environment readiness</strong>
-            <p className="helper-text">
-              These checks run before session start so common setup problems are easier to catch early.
-            </p>
-          </div>
-          <button type="button" className="ghost" onClick={onRefreshReadiness} disabled={!repoPath.trim() || isLoadingReadiness}>
-            {isLoadingReadiness ? "Checking..." : "Refresh"}
-          </button>
-        </div>
-        {!repoPath.trim() ? (
-          <p className="helper-text">Enter one real project folder to run readiness checks.</p>
-        ) : isLoadingReadiness ? (
-          <p className="helper-text">Checking Codex, Git, project access, and Linux sandbox readiness...</p>
-        ) : readiness ? (
-          <>
-            <div className={`readiness-overall readiness-${readiness.overallStatus}`}>
-              <strong>{formatReadinessStatusLabel(readiness.overallStatus)}</strong>
-              <span>{readiness.canStart ? "This project can start a session." : "Fix the failed items below before starting a session."}</span>
-            </div>
-            <div className="readiness-list">
-              {readiness.items.map((item) => (
-                <article key={item.key} className={`readiness-item readiness-${item.status}`}>
-                  <div className="readiness-item-header">
-                    <strong>{item.message}</strong>
-                    <span className="section-chip">{formatReadinessStatusLabel(item.status)}</span>
-                  </div>
-                  <p className="helper-text">{item.recommendedAction}</p>
-                </article>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className="helper-text">Could not run readiness checks yet. Try refreshing after you choose a project folder.</p>
-        )}
-      </div>
-      <div className="project-create-card">
-        <div className="project-create-header">
-          <strong>Create new project here</strong>
-          <span className="helper-text">Use this only when the path above is meant to become a brand-new project folder.</span>
-        </div>
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={createProjectOptions.createFolder}
-            onChange={(event) =>
-              onCreateProjectOptionChange({
-                ...createProjectOptions,
-                createFolder: event.target.checked
-              })
-            }
-          />
-          <span>Create folder</span>
-        </label>
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={createProjectOptions.initializeGit}
-            onChange={(event) =>
-              onCreateProjectOptionChange({
-                ...createProjectOptions,
-                initializeGit: event.target.checked
-              })
-            }
-          />
-          <span>Initialize Git repository</span>
-        </label>
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={createProjectOptions.createReadme}
-            onChange={(event) =>
-              onCreateProjectOptionChange({
-                ...createProjectOptions,
-                createReadme: event.target.checked
-              })
-            }
-          />
-          <span>Create README.md</span>
-        </label>
-        <button
-          type="button"
-          className="secondary"
-          onClick={onCreateProject}
-          disabled={isCreatingProject || status.active || !repoPath.trim()}
+      <div className="project-secondary-sections">
+        <CollapsibleSection
+          title="Environment readiness"
+          subtitle={
+            !repoPath.trim()
+              ? "Choose one real project folder to run quick readiness checks."
+              : readiness
+                ? `${formatReadinessStatusLabel(readiness.overallStatus)}. ${
+                    readiness.canStart ? "This project can start a session." : "Fix the failed items before starting."
+                  }`
+                : "Run a quick check for Codex, Git, project access, and Linux sandbox readiness."
+          }
+          defaultExpanded={readinessHasPriorityState}
         >
-          {isCreatingProject ? "Creating project..." : "Create new project"}
-        </button>
-        {projectMessage ? <p className="success-banner compact-success">{projectMessage}</p> : null}
+          <div className="readiness-card">
+            <div className="readiness-card-header">
+              <div>
+                <strong>Session preflight</strong>
+                <p className="helper-text">These checks catch common setup problems before Codex starts.</p>
+              </div>
+              <button type="button" className="ghost" onClick={onRefreshReadiness} disabled={!repoPath.trim() || isLoadingReadiness}>
+                {isLoadingReadiness ? "Checking..." : "Refresh"}
+              </button>
+            </div>
+            {!repoPath.trim() ? (
+              <p className="helper-text">Enter one real project folder to run readiness checks.</p>
+            ) : isLoadingReadiness ? (
+              <p className="helper-text">Checking Codex, Git, project access, and Linux sandbox readiness...</p>
+            ) : readiness ? (
+              <>
+                <div className={`readiness-overall readiness-${readiness.overallStatus}`}>
+                  <strong>{formatReadinessStatusLabel(readiness.overallStatus)}</strong>
+                  <span>{readiness.canStart ? "This project can start a session." : "Fix the failed items below before starting a session."}</span>
+                </div>
+                <div className="readiness-list">
+                  {readiness.items.map((item) => (
+                    <article key={item.key} className={`readiness-item readiness-${item.status}`}>
+                      <div className="readiness-item-header">
+                        <strong>{item.message}</strong>
+                        <span className="section-chip">{formatReadinessStatusLabel(item.status)}</span>
+                      </div>
+                      <p className="helper-text">{item.recommendedAction}</p>
+                    </article>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="helper-text">Could not run readiness checks yet. Try refreshing after you choose a project folder.</p>
+            )}
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Create new project"
+          subtitle="Use the path above only when you want this app to create a brand-new project folder."
+        >
+          <div className="project-create-card">
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={createProjectOptions.createFolder}
+                onChange={(event) =>
+                  onCreateProjectOptionChange({
+                    ...createProjectOptions,
+                    createFolder: event.target.checked
+                  })
+                }
+              />
+              <span>Create folder</span>
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={createProjectOptions.initializeGit}
+                onChange={(event) =>
+                  onCreateProjectOptionChange({
+                    ...createProjectOptions,
+                    initializeGit: event.target.checked
+                  })
+                }
+              />
+              <span>Initialize Git repository</span>
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={createProjectOptions.createReadme}
+                onChange={(event) =>
+                  onCreateProjectOptionChange({
+                    ...createProjectOptions,
+                    createReadme: event.target.checked
+                  })
+                }
+              />
+              <span>Create README.md</span>
+            </label>
+            <button
+              type="button"
+              className="secondary"
+              onClick={onCreateProject}
+              disabled={isCreatingProject || status.active || !repoPath.trim()}
+            >
+              {isCreatingProject ? "Creating project..." : "Create new project"}
+            </button>
+            {projectMessage ? <p className="success-banner compact-success">{projectMessage}</p> : null}
+          </div>
+        </CollapsibleSection>
       </div>
       <div className="control-actions">
         <button type="button" onClick={onStartSession} disabled={status.active || !repoPath.trim()}>
@@ -328,34 +376,37 @@ export function ProjectControls({
           <strong>{isLoadingSettings ? "Loading..." : defaultRepoRoot || "Choose a folder"}</strong>
         </div>
       </div>
-      <div className="recent-projects">
-        <div className="recent-projects-header">
-          <strong>Recent projects</strong>
-          <span className="section-chip">{recentProjects.length}</span>
+      <CollapsibleSection
+        title="Recent projects"
+        subtitle={
+          isLoadingRecentProjects
+            ? "Loading recent projects..."
+            : recentProjects.length === 0
+              ? "Open a project once and it will appear here for quick reuse."
+              : `${recentProjects.length} recent project${recentProjects.length === 1 ? "" : "s"} available.`
+        }
+      >
+        <div className="recent-projects">
+          {recentProjects.length > 0 ? (
+            <div className="recent-project-list">
+              {recentProjects.map((project) => (
+                <button
+                  key={project.repoPath}
+                  type="button"
+                  className={`recent-project-chip ${project.available ? "" : "unavailable"}`}
+                  onClick={() => onRepoPathChange(project.repoPath)}
+                  disabled={!project.available}
+                >
+                  <span className="recent-project-path">{project.repoPath}</span>
+                  <span className="recent-project-meta">
+                    {project.available ? `${project.openCount} open${project.openCount === 1 ? "" : "s"}` : "Unavailable"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
-        {isLoadingRecentProjects ? <p className="helper-text">Loading recent projects...</p> : null}
-        {!isLoadingRecentProjects && recentProjects.length === 0 ? (
-          <p className="helper-text">Open a project once and it will appear here for quick reuse.</p>
-        ) : null}
-        {recentProjects.length > 0 ? (
-          <div className="recent-project-list">
-            {recentProjects.map((project) => (
-              <button
-                key={project.repoPath}
-                type="button"
-                className={`recent-project-chip ${project.available ? "" : "unavailable"}`}
-                onClick={() => onRepoPathChange(project.repoPath)}
-                disabled={!project.available}
-              >
-                <span className="recent-project-path">{project.repoPath}</span>
-                <span className="recent-project-meta">
-                  {project.available ? `${project.openCount} open${project.openCount === 1 ? "" : "s"}` : "Unavailable"}
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
+      </CollapsibleSection>
     </section>
   );
 }
@@ -538,10 +589,7 @@ export function ComposerPanel({
           <p className="section-kicker">Prompt</p>
           <h2>Guide Codex intentionally</h2>
           <p className="helper-text">
-            Write the task, attach supporting context, and review the final assembled prompt before sending it.
-          </p>
-          <p className="helper-text">
-            Paste short notes directly. Attach standalone files for existing documents, logs, images, or PDFs. Use a ZIP when you want Codex to inspect a larger folder or repository snapshot.
+            Write the task, attach supporting context, and review the final assembled prompt before sending it. Paste short notes directly, attach standalone files when they already exist, and use a ZIP for larger repo snapshots.
           </p>
           {terminalGuidance ? <p className="helper-text composer-guidance">{terminalGuidance}</p> : null}
         </div>
@@ -549,7 +597,7 @@ export function ComposerPanel({
           <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={!status.active}>
             Attach files
           </button>
-          <span className="helper-text">Drop files here, use the picker, or paste an image directly into the prompt box. ZIPs work best for multi-file repo context.</span>
+          <span className="helper-text">Drop files here, use the picker, or paste an image directly into the prompt box.</span>
         </div>
       </div>
       <input
@@ -628,7 +676,7 @@ export function ComposerPanel({
           Send prompt
         </button>
         <span className="helper-text">
-          Pasted text under 10,000 characters stays inline. At 10,000 characters or more it becomes a local context file automatically. Use file upload for existing documents and ZIPs for larger code bundles.
+          Short pasted text stays inline. Large pasted text becomes a saved local context file automatically.
         </span>
       </div>
       {contextMessage ? <p className="success-banner">{contextMessage}</p> : null}
@@ -646,6 +694,8 @@ export function RepoInsightsPanel({
   onViewDiff,
   onCopyDiff
 }: RepoInsightsPanelProps) {
+  const hasDiffState = diffViewer.isLoading || Boolean(diffViewer.error) || Boolean(diffViewer.diff) || Boolean(diffEmptyState);
+
   return (
     <section className="git-section rail-card">
       <div className="section-heading">
@@ -663,46 +713,62 @@ export function RepoInsightsPanel({
         </div>
       ) : null}
       {!status.active ? <p className="git-empty">Start a session to see repo status.</p> : null}
-      {status.active && isLoadingGitStatus ? <p className="git-empty">Loading repo status...</p> : null}
-      {status.active && gitStatus ? (
-        gitStatus.isGitRepo ? (
-          <div className="git-stats">
-            <article className="git-stat-card">
-              <span className="git-stat-label">Branch</span>
-              <strong>{gitStatus.branch || "Unknown"}</strong>
-            </article>
-            <article className="git-stat-card">
-              <span className="git-stat-label">Changed files</span>
-              <strong>{gitStatus.changedFilesCount}</strong>
-            </article>
-            <article className="git-stat-card">
-              <span className="git-stat-label">Staged files</span>
-              <strong>{gitStatus.stagedFilesCount}</strong>
-            </article>
-            <article className="git-stat-card">
-              <span className="git-stat-label">Untracked files</span>
-              <strong>{gitStatus.untrackedFilesCount}</strong>
-            </article>
-          </div>
-        ) : (
-          <p className="git-empty">{gitStatus.message || "This folder is not a Git repository."}</p>
-        )
-      ) : null}
-      {status.active && (diffViewer.isLoading || diffViewer.error || diffViewer.diff) ? (
-        <div className="diff-viewer">
-          <div className="diff-header">
-            <h3>Current diff</h3>
-            <div className="diff-actions">
-              <button type="button" className="ghost" onClick={onCopyDiff} disabled={!diffPanelText}>
-                Copy diff
-              </button>
-            </div>
-          </div>
-          {diffViewer.isLoading ? <p className="git-empty">Loading diff...</p> : null}
-          {!diffViewer.isLoading && diffViewer.error ? <p className="git-empty">{diffViewer.error}</p> : null}
-          {!diffViewer.isLoading && !diffViewer.error && diffEmptyState ? <p className="git-empty">{diffEmptyState}</p> : null}
-          {!diffViewer.isLoading && !diffViewer.error && diffPanelText ? <pre className="diff-panel">{diffPanelText}</pre> : null}
-        </div>
+      {status.active ? (
+        <CollapsibleSection
+          title="Repo details"
+          subtitle={
+            isLoadingGitStatus
+              ? "Loading repo status..."
+              : gitStatus?.isGitRepo
+                ? `Branch ${gitStatus.branch || "Unknown"} · ${gitStatus.changedFilesCount} changed · ${gitStatus.stagedFilesCount} staged · ${gitStatus.untrackedFilesCount} untracked`
+                : gitStatus?.message || "This folder is not a Git repository."
+          }
+          defaultExpanded={hasDiffState}
+        >
+          <>
+            {isLoadingGitStatus ? <p className="git-empty">Loading repo status...</p> : null}
+            {!isLoadingGitStatus && gitStatus ? (
+              gitStatus.isGitRepo ? (
+                <div className="git-stats">
+                  <article className="git-stat-card">
+                    <span className="git-stat-label">Branch</span>
+                    <strong>{gitStatus.branch || "Unknown"}</strong>
+                  </article>
+                  <article className="git-stat-card">
+                    <span className="git-stat-label">Changed files</span>
+                    <strong>{gitStatus.changedFilesCount}</strong>
+                  </article>
+                  <article className="git-stat-card">
+                    <span className="git-stat-label">Staged files</span>
+                    <strong>{gitStatus.stagedFilesCount}</strong>
+                  </article>
+                  <article className="git-stat-card">
+                    <span className="git-stat-label">Untracked files</span>
+                    <strong>{gitStatus.untrackedFilesCount}</strong>
+                  </article>
+                </div>
+              ) : (
+                <p className="git-empty">{gitStatus.message || "This folder is not a Git repository."}</p>
+              )
+            ) : null}
+            {hasDiffState ? (
+              <div className="diff-viewer">
+                <div className="diff-header">
+                  <h3>Current diff</h3>
+                  <div className="diff-actions">
+                    <button type="button" className="ghost" onClick={onCopyDiff} disabled={!diffPanelText}>
+                      Copy diff
+                    </button>
+                  </div>
+                </div>
+                {diffViewer.isLoading ? <p className="git-empty">Loading diff...</p> : null}
+                {!diffViewer.isLoading && diffViewer.error ? <p className="git-empty">{diffViewer.error}</p> : null}
+                {!diffViewer.isLoading && !diffViewer.error && diffEmptyState ? <p className="git-empty">{diffEmptyState}</p> : null}
+                {!diffViewer.isLoading && !diffViewer.error && diffPanelText ? <pre className="diff-panel">{diffPanelText}</pre> : null}
+              </div>
+            ) : null}
+          </>
+        </CollapsibleSection>
       ) : null}
     </section>
   );
@@ -771,6 +837,15 @@ export function SessionHistoryPanel({
               >
                 Copy transcript
               </button>
+            </div>
+          </div>
+          <p className="transcript-helper-text">Cleaned transcript output keeps the session readable while preserving the actual flow.</p>
+          <CollapsibleSection
+            title="Export options"
+            subtitle="Download the cleaned transcript or the raw terminal output when you need a deeper debug artifact."
+            defaultExpanded={false}
+          >
+            <div className="transcript-export-actions">
               <button
                 type="button"
                 className="ghost"
@@ -796,10 +871,7 @@ export function SessionHistoryPanel({
                 Download raw
               </button>
             </div>
-          </div>
-          <p className="transcript-helper-text">
-            Cleaned transcript output preserves the readable session flow while removing terminal control noise. Raw terminal output is still available for debugging when needed.
-          </p>
+          </CollapsibleSection>
           {transcriptViewer.isLoading ? <p className="history-empty">Loading transcript...</p> : null}
           {!transcriptViewer.isLoading && transcriptViewer.error ? <p className="history-empty">{transcriptViewer.error}</p> : null}
           {!transcriptViewer.isLoading && !transcriptViewer.error ? (
@@ -828,7 +900,6 @@ export function ConsoleView({
   terminalContainerRef
 }: ConsoleViewProps) {
   const terminalGuidance = buildTerminalGuidance(sessionBanner);
-  const sessionMoments = buildSessionMomentRows(sessionBanner, sessionActivity);
 
   return (
     <div className="console-layout">
@@ -848,23 +919,14 @@ export function ConsoleView({
             data-session-state={sessionBanner.state}
           >
             <div className="terminal-stage-header">
-            <div>
-              <p className="section-kicker">Console</p>
-              <h2>Live Codex terminal</h2>
+              <div>
+                <p className="section-kicker">Console</p>
+                <h2>Live Codex terminal</h2>
+              </div>
+              <div className="terminal-stage-meta">
+                <span className="section-chip">{status.active ? formatSessionBannerStateLabel(sessionBanner.state) : "Waiting"}</span>
+              </div>
             </div>
-            <div className="terminal-stage-meta">
-              <span className="section-chip">{status.active ? formatSessionBannerStateLabel(sessionBanner.state) : "Waiting"}</span>
-              {sessionMoments.length > 0 ? (
-                <div className="terminal-stage-metadata">
-                  {sessionMoments.map((row) => (
-                    <span key={row.label}>
-                      <strong>{row.label}:</strong> {row.value}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
             {terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
             <div ref={terminalContainerRef} className="terminal-panel" />
           </div>

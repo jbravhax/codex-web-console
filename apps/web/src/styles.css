@@ -220,10 +220,7 @@ textarea {
 .readiness-card {
   display: grid;
   gap: 0.85rem;
-  padding: 1rem;
-  border: 1px solid var(--panel-border);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 0.1rem 0 0;
 }
 
 .readiness-card-header {
@@ -396,8 +393,44 @@ textarea {
   font-weight: 600;
 }
 
-.recent-projects {
+.project-secondary-sections {
+  display: grid;
+  gap: 0.85rem;
   margin-top: 1rem;
+}
+
+.collapsible-section {
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 0.95rem 1rem;
+}
+
+.collapsible-section-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.collapsible-section-header strong {
+  display: block;
+}
+
+.collapsible-section-subtitle {
+  margin-top: 0.3rem;
+}
+
+.collapsible-toggle {
+  min-width: 84px;
+}
+
+.collapsible-section-body {
+  margin-top: 0.85rem;
+}
+
+.recent-projects {
+  margin-top: 0.1rem;
 }
 
 .recent-projects-header {
@@ -461,20 +494,6 @@ textarea {
 .project-create-card {
   display: grid;
   gap: 0.75rem;
-  margin-top: 1rem;
-  padding: 0.95rem 1rem;
-  border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
-}
-
-.project-create-header {
-  display: grid;
-  gap: 0.25rem;
-}
-
-.project-create-header .helper-text {
-  margin-top: 0;
 }
 
 .checkbox-row {
@@ -1282,15 +1301,6 @@ textarea {
   gap: 0.45rem;
 }
 
-.terminal-stage-metadata {
-  display: grid;
-  gap: 0.2rem;
-  justify-items: end;
-  color: var(--muted);
-  font-size: 0.84rem;
-  text-align: right;
-}
-
 .terminal-stage-attention .terminal-panel,
 .terminal-section[data-session-state="awaiting-approval"] .terminal-panel {
   border-color: rgba(245, 158, 11, 0.55);
@@ -1331,6 +1341,7 @@ textarea {
 .prompt-preview-panel,
 .context-preview,
 .transcript-viewer,
+.collapsible-section,
 .prompt-preview-section,
 .git-stat-card,
 .history-item,
@@ -1375,6 +1386,12 @@ textarea {
 
 .diff-viewer {
   margin-top: 1.25rem;
+}
+
+.transcript-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .history-list {
@@ -1461,10 +1478,14 @@ textarea {
     justify-content: start;
   }
 
-  .terminal-stage-meta,
-  .terminal-stage-metadata {
+  .terminal-stage-meta {
     justify-items: start;
     text-align: left;
+  }
+
+  .transcript-export-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .repo-input-row {
