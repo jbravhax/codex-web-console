@@ -222,7 +222,13 @@ export function ProjectControls({
   recentProjects,
   isLoadingRecentProjects
 }: ProjectControlsProps) {
-  const readinessHasPriorityState = isLoadingReadiness || readiness?.overallStatus === "warning" || readiness?.overallStatus === "failed";
+  const readinessSummary = !repoPath.trim()
+    ? "Choose one project folder to run a quick check."
+    : readiness
+      ? `${formatReadinessStatusLabel(readiness.overallStatus)}. ${
+          readiness.canStart ? "Ready to start." : "Needs attention before start."
+        }`
+      : "Quick check for Codex, Git, project access, and Linux sandbox readiness.";
 
   return (
     <section className="controls rail-card">
@@ -247,64 +253,105 @@ export function ProjectControls({
         </button>
       </div>
       <p className="helper-text">
-        Paste one real project folder path here. Manual entry is the primary path, and the browser folder picker is only a convenience because some browsers cannot share a usable absolute path.
+        Paste one specific project folder path. Use the browser picker only when it can share a usable path.
       </p>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
-      <div className="project-secondary-sections">
-        <CollapsibleSection
-          title="Environment readiness"
-          subtitle={
-            !repoPath.trim()
-              ? "Choose one real project folder to run quick readiness checks."
-              : readiness
-                ? `${formatReadinessStatusLabel(readiness.overallStatus)}. ${
-                    readiness.canStart ? "This project can start a session." : "Fix the failed items before starting."
-                  }`
-                : "Run a quick check for Codex, Git, project access, and Linux sandbox readiness."
-          }
-          defaultExpanded={readinessHasPriorityState}
-        >
-          <div className="readiness-card">
-            <div className="readiness-card-header">
-              <div>
-                <strong>Session preflight</strong>
-                <p className="helper-text">These checks catch common setup problems before Codex starts.</p>
-              </div>
-              <button type="button" className="ghost" onClick={onRefreshReadiness} disabled={!repoPath.trim() || isLoadingReadiness}>
-                {isLoadingReadiness ? "Checking..." : "Refresh"}
-              </button>
+      <CollapsibleSection title="Environment readiness" subtitle={readinessSummary}>
+        <div className="readiness-card">
+          <div className="readiness-card-header">
+            <div>
+              <strong>Session preflight</strong>
             </div>
-            {!repoPath.trim() ? (
-              <p className="helper-text">Enter one real project folder to run readiness checks.</p>
-            ) : isLoadingReadiness ? (
-              <p className="helper-text">Checking Codex, Git, project access, and Linux sandbox readiness...</p>
-            ) : readiness ? (
-              <>
-                <div className={`readiness-overall readiness-${readiness.overallStatus}`}>
-                  <strong>{formatReadinessStatusLabel(readiness.overallStatus)}</strong>
-                  <span>{readiness.canStart ? "This project can start a session." : "Fix the failed items below before starting a session."}</span>
-                </div>
-                <div className="readiness-list">
-                  {readiness.items.map((item) => (
-                    <article key={item.key} className={`readiness-item readiness-${item.status}`}>
-                      <div className="readiness-item-header">
-                        <strong>{item.message}</strong>
-                        <span className="section-chip">{formatReadinessStatusLabel(item.status)}</span>
-                      </div>
-                      <p className="helper-text">{item.recommendedAction}</p>
-                    </article>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="helper-text">Could not run readiness checks yet. Try refreshing after you choose a project folder.</p>
-            )}
+            <button type="button" className="ghost" onClick={onRefreshReadiness} disabled={!repoPath.trim() || isLoadingReadiness}>
+              {isLoadingReadiness ? "Checking..." : "Refresh"}
+            </button>
           </div>
-        </CollapsibleSection>
-
+          {!repoPath.trim() ? (
+            <p className="helper-text">Enter one project folder to run readiness checks.</p>
+          ) : isLoadingReadiness ? (
+            <p className="helper-text">Checking Codex, Git, project access, and Linux sandbox readiness...</p>
+          ) : readiness ? (
+            <>
+              <div className={`readiness-overall readiness-${readiness.overallStatus}`}>
+                <strong>{formatReadinessStatusLabel(readiness.overallStatus)}</strong>
+                <span>{readiness.canStart ? "This project can start a session." : "Fix the failed items below before starting a session."}</span>
+              </div>
+              <div className="readiness-list">
+                {readiness.items.map((item) => (
+                  <article key={item.key} className={`readiness-item readiness-${item.status}`}>
+                    <div className="readiness-item-header">
+                      <strong>{item.message}</strong>
+                      <span className="section-chip">{formatReadinessStatusLabel(item.status)}</span>
+                    </div>
+                    <p className="helper-text">{item.recommendedAction}</p>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="helper-text">Could not run readiness checks yet. Refresh after choosing a project folder.</p>
+          )}
+        </div>
+      </CollapsibleSection>
+      <div className="control-actions">
+        <button
+          type="button"
+          className="primary-action-button"
+          onClick={onStartSession}
+          disabled={status.active || !repoPath.trim()}
+        >
+          Start session
+        </button>
+        <button type="button" onClick={onStopSession} disabled={!status.active} className="destructive">
+          Stop session
+        </button>
+      </div>
+      <div className="meta-row">
+        <div className="meta-pill">
+          <span className="meta-label">Server</span>
+          <strong>{connectionStateLabel}</strong>
+        </div>
+        <div className="meta-pill">
+          <span className="meta-label">Default repo root</span>
+          <strong>{isLoadingSettings ? "Loading..." : defaultRepoRoot || "Choose a folder"}</strong>
+        </div>
+      </div>
+      <CollapsibleSection
+        title="Recent projects"
+        subtitle={
+          isLoadingRecentProjects
+            ? "Loading recent projects..."
+            : recentProjects.length === 0
+              ? "Open a project once and it will appear here for quick reuse."
+              : `${recentProjects.length} recent project${recentProjects.length === 1 ? "" : "s"} available.`
+        }
+      >
+        <div className="recent-projects">
+          {recentProjects.length > 0 ? (
+            <div className="recent-project-list">
+              {recentProjects.map((project) => (
+                <button
+                  key={project.repoPath}
+                  type="button"
+                  className={`recent-project-chip ${project.available ? "" : "unavailable"}`}
+                  onClick={() => onRepoPathChange(project.repoPath)}
+                  disabled={!project.available}
+                >
+                  <span className="recent-project-path">{project.repoPath}</span>
+                  <span className="recent-project-meta">
+                    {project.available ? `${project.openCount} open${project.openCount === 1 ? "" : "s"}` : "Unavailable"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </CollapsibleSection>
+      <div className="project-secondary-sections">
+        <p className="section-divider-label">Or create a new project</p>
         <CollapsibleSection
           title="Create new project"
-          subtitle="Use the path above only when you want this app to create a brand-new project folder."
+          subtitle="Use the path above only when you want the app to create a brand-new folder."
         >
           <div className="project-create-card">
             <label className="checkbox-row">
@@ -358,55 +405,6 @@ export function ProjectControls({
           </div>
         </CollapsibleSection>
       </div>
-      <div className="control-actions">
-        <button type="button" onClick={onStartSession} disabled={status.active || !repoPath.trim()}>
-          Start session
-        </button>
-        <button type="button" onClick={onStopSession} disabled={!status.active} className="destructive">
-          Stop session
-        </button>
-      </div>
-      <div className="meta-row">
-        <div className="meta-pill">
-          <span className="meta-label">Server</span>
-          <strong>{connectionStateLabel}</strong>
-        </div>
-        <div className="meta-pill">
-          <span className="meta-label">Default repo root</span>
-          <strong>{isLoadingSettings ? "Loading..." : defaultRepoRoot || "Choose a folder"}</strong>
-        </div>
-      </div>
-      <CollapsibleSection
-        title="Recent projects"
-        subtitle={
-          isLoadingRecentProjects
-            ? "Loading recent projects..."
-            : recentProjects.length === 0
-              ? "Open a project once and it will appear here for quick reuse."
-              : `${recentProjects.length} recent project${recentProjects.length === 1 ? "" : "s"} available.`
-        }
-      >
-        <div className="recent-projects">
-          {recentProjects.length > 0 ? (
-            <div className="recent-project-list">
-              {recentProjects.map((project) => (
-                <button
-                  key={project.repoPath}
-                  type="button"
-                  className={`recent-project-chip ${project.available ? "" : "unavailable"}`}
-                  onClick={() => onRepoPathChange(project.repoPath)}
-                  disabled={!project.available}
-                >
-                  <span className="recent-project-path">{project.repoPath}</span>
-                  <span className="recent-project-meta">
-                    {project.available ? `${project.openCount} open${project.openCount === 1 ? "" : "s"}` : "Unavailable"}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </CollapsibleSection>
     </section>
   );
 }
@@ -589,7 +587,7 @@ export function ComposerPanel({
           <p className="section-kicker">Prompt</p>
           <h2>Guide Codex intentionally</h2>
           <p className="helper-text">
-            Write the task, attach supporting context, and review the final assembled prompt before sending it. Paste short notes directly, attach standalone files when they already exist, and use a ZIP for larger repo snapshots.
+            Write the task, attach context when needed, and send it when you're ready.
           </p>
           {terminalGuidance ? <p className="helper-text composer-guidance">{terminalGuidance}</p> : null}
         </div>
@@ -597,7 +595,7 @@ export function ComposerPanel({
           <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={!status.active}>
             Attach files
           </button>
-          <span className="helper-text">Drop files here, use the picker, or paste an image directly into the prompt box.</span>
+          <span className="helper-text">Drop files here or paste an image into the prompt box.</span>
         </div>
       </div>
       <input
@@ -630,7 +628,9 @@ export function ComposerPanel({
         <div className="prompt-preview-header">
           <div>
             <strong>What Codex will receive</strong>
-            <p className="helper-text">This is the exact generated prompt that will be sent, including saved context references.</p>
+            {isPromptPreviewExpanded ? (
+              <p className="helper-text">This is the exact generated prompt that will be sent, including saved context references.</p>
+            ) : null}
           </div>
           <div className="prompt-preview-actions">
             <button type="button" className="ghost" onClick={onTogglePromptPreview}>
@@ -676,7 +676,7 @@ export function ComposerPanel({
           Send prompt
         </button>
         <span className="helper-text">
-          Short pasted text stays inline. Large pasted text becomes a saved local context file automatically.
+          Short pasted text stays inline. Large pasted text becomes a local context file.
         </span>
       </div>
       {contextMessage ? <p className="success-banner">{contextMessage}</p> : null}
@@ -828,7 +828,13 @@ export function SessionHistoryPanel({
                 <span>{formatDuration(transcriptViewer.session.durationMs)}</span>
               </p>
             </div>
-            <div className="transcript-actions">
+          </div>
+          <CollapsibleSection
+            title="Transcript tools"
+            subtitle="Copy or export this transcript when you need it."
+            defaultExpanded={false}
+          >
+            <div className="transcript-export-actions">
               <button
                 type="button"
                 className="ghost"
@@ -837,15 +843,6 @@ export function SessionHistoryPanel({
               >
                 Copy transcript
               </button>
-            </div>
-          </div>
-          <p className="transcript-helper-text">Cleaned transcript output keeps the session readable while preserving the actual flow.</p>
-          <CollapsibleSection
-            title="Export options"
-            subtitle="Download the cleaned transcript or the raw terminal output when you need a deeper debug artifact."
-            defaultExpanded={false}
-          >
-            <div className="transcript-export-actions">
               <button
                 type="button"
                 className="ghost"

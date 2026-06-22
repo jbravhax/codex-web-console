@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.4.0] - 2026-06-22
+
+### Added
+
+- Added stronger session trust states and browser-side guidance so users can tell when Codex is starting, running, waiting for approval, waiting for input, completed, disconnected, or failed.
+- Added environment readiness checks that validate Codex availability, Git availability, project-folder access, and Linux sandbox prerequisites before session start.
+- Added clearer project classification so the app can distinguish real project folders, broad parent folders, empty folders, and invalid paths before launch.
+
+### Changed
+
+- Improved session trust and visibility across the session banner, terminal emphasis, and prompt flow so approval waits and long-running work are easier to follow.
+- Improved project and repository onboarding with better path guidance, stronger folder classification, and clearer create-project messaging.
+- Simplified the main console layout by de-emphasizing lower-frequency tools and making prompt, terminal, and status more central to the workflow.
+- Improved transcript cleanup, transcript export, ZIP messaging, and recovery guidance so debugging and review workflows feel more dependable.
+- Hardened disconnect and recovery messaging so users get clearer next steps when the browser, websocket, or PTY session drops.
+
+### Fixed
+
+- Improved transcript fidelity around terminal redraw and control-sequence cleanup without removing meaningful output.
+- Improved ZIP review summaries and skipped-file explanations so accepted and rejected content is easier to understand at a glance.
+- Improved session diagnostics so common startup and runtime failures are surfaced with more actionable user-facing messaging.
+
+### Known limitations
+
+- `multer` 1.x remains an isolated and documented dependency debt in the local upload path.
+- Browser folder picker limitations still depend on browser security and may not expose a usable absolute path.
+- Live session reattach or resume is not supported yet after refresh or disconnect.
+- The UI is calmer than before, but some dashboard density remains in the main workspace.
+
+### Release notes
+
+Theme: Trust & Simplicity
+
+- Session trust and visibility are much clearer, especially around approval waits, completion, disconnects, and failures.
+- Environment readiness checks now catch common setup issues before users try to start Codex.
+- Project and repository onboarding is safer and easier to understand for first-time use.
+- The interface is cleaner, with prompt, terminal, and status taking priority over secondary tools.
+- Transcript handling, ZIP messaging, and recovery guidance are more trustworthy and easier to use.
+
 ## [0.3.0] - 2026-06-22
 
 ### Added

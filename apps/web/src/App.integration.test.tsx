@@ -276,7 +276,7 @@ describe("App integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choose folder" }));
 
     expect(await screen.findByText(REPO_PICKER_UNSUPPORTED_MESSAGE)).toBeTruthy();
-    expect(screen.getByText(/Manual entry is the primary path/i)).toBeTruthy();
+    expect(screen.getByText(/Paste one specific project folder path/i)).toBeTruthy();
   });
 
   it("shows environment readiness details for the selected project", async () => {
@@ -310,6 +310,12 @@ describe("App integration", () => {
     });
 
     expect(await screen.findByText("Environment readiness")).toBeTruthy();
+    const readinessSection = screen.getByText("Environment readiness").closest("section");
+    if (!readinessSection) {
+      throw new Error("Expected readiness section.");
+    }
+
+    fireEvent.click(within(readinessSection).getByRole("button", { name: "Show" }));
     expect(await screen.findByText("Git is not available on this machine right now.")).toBeTruthy();
     expect(screen.getByText("This project can start a session.")).toBeTruthy();
   });
@@ -422,6 +428,12 @@ describe("App integration", () => {
       }
     });
 
+    const readinessSection = screen.getByText("Environment readiness").closest("section");
+    if (!readinessSection) {
+      throw new Error("Expected readiness section.");
+    }
+
+    fireEvent.click(within(readinessSection).getByRole("button", { name: "Show" }));
     expect(await screen.findByText(/broad parent directory/i)).toBeTruthy();
     expect(await screen.findByText(/choose the specific project folder you want codex to work in/i)).toBeTruthy();
   });
@@ -779,12 +791,12 @@ describe("App integration", () => {
 
     expect(screen.queryByRole("button", { name: "Download .txt" })).toBeNull();
 
-    const exportSection = screen.getByText("Export options").closest("section");
-    if (!exportSection) {
-      throw new Error("Expected transcript export section.");
+    const transcriptToolsSection = screen.getByText("Transcript tools").closest("section");
+    if (!transcriptToolsSection) {
+      throw new Error("Expected transcript tools section.");
     }
 
-    fireEvent.click(within(exportSection).getByRole("button", { name: "Show" }));
+    fireEvent.click(within(transcriptToolsSection).getByRole("button", { name: "Show" }));
     expect(await screen.findByRole("button", { name: "Download .txt" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Download raw" })).toBeTruthy();
   });
@@ -814,6 +826,12 @@ describe("App integration", () => {
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
 
+    const transcriptToolsSection = screen.getByText("Transcript tools").closest("section");
+    if (!transcriptToolsSection) {
+      throw new Error("Expected transcript tools section.");
+    }
+
+    fireEvent.click(within(transcriptToolsSection).getByRole("button", { name: "Show" }));
     fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
 
     expect(
@@ -845,6 +863,12 @@ describe("App integration", () => {
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
 
+    const transcriptToolsSection = screen.getByText("Transcript tools").closest("section");
+    if (!transcriptToolsSection) {
+      throw new Error("Expected transcript tools section.");
+    }
+
+    fireEvent.click(within(transcriptToolsSection).getByRole("button", { name: "Show" }));
     fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
 
     expect(
