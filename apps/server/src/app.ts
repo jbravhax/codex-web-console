@@ -1,14 +1,13 @@
 import express, { type Response } from "express";
-import multer from "multer";
-import { MulterError } from "multer";
 import { loadConfig, saveConfig, type AppConfig } from "./config.js";
-import { MAX_ZIP_UPLOAD_BYTES, saveUploadedAttachment } from "./attachments.js";
+import { saveUploadedAttachment } from "./attachments.js";
 import { savePastedDocument } from "./documents.js";
 import { getGitDiff } from "./git-diff.js";
 import { getGitStatus } from "./git-status.js";
 import { createRecentProjectsStore } from "./recent-projects.js";
 import { createProject } from "./projects.js";
 import { SessionManager } from "./session.js";
+import { handleUploadMiddlewareError, type AttachmentUploadRequest, uploadSingleAttachment } from "./upload-middleware.js";
 
 export type AppServices = {
   getConfig(): AppConfig;
@@ -36,12 +35,6 @@ export function createServices(initialConfig?: AppConfig): AppServices {
 
 export function createApp(services: AppServices) {
   const app = express();
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-      fileSize: MAX_ZIP_UPLOAD_BYTES
-    }
-  });
 
   app.use(express.json({ limit: "2mb" }));
 
@@ -144,26 +137,21 @@ export function createApp(services: AppServices) {
   });
 
   app.post("/api/attachments", (request, response) => {
-    upload.single("file")(request, response, async (uploadError) => {
-      if (uploadError instanceof MulterError && uploadError.code === "LIMIT_FILE_SIZE") {
-        sendBadRequest(response, "Could not upload attachment.", new Error("Attachment is too large. The current upload limit is 50MB."));
-        return;
-      }
-
-      if (uploadError) {
-        sendBadRequest(response, "Could not upload attachment.", new Error(uploadError.message || "Could not upload attachment."));
+    uploadSingleAttachment(request, response, async (uploadError) => {
+      if (handleUploadMiddlewareError(response, uploadError)) {
         return;
       }
 
       try {
         const repoPath = readString(request.body?.repoPath);
-        if (!request.file) {
+        const uploadRequest = request as AttachmentUploadRequest;
+        if (!uploadRequest.file) {
           throw new Error("Choose a file to attach.");
         }
 
         const attachment = await saveUploadedAttachment({
           repoPath,
-          file: request.file,
+          file: uploadRequest.file,
           overrideFileName: readString(request.body?.overrideFileName) || undefined
         });
 

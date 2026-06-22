@@ -463,5 +463,6 @@ describe("ensureSafeZipEntryName", () => {
   it("rejects path traversal entries", () => {
     expect(() => ensureSafeZipEntryName("../escape.md")).toThrow("path traversal");
     expect(() => ensureSafeZipEntryName("nested/../../escape.md")).toThrow("path traversal");
+    expect(() => ensureSafeZipEntryName("nested\\..\\..\\escape.md")).toThrow("path traversal");
   });
 });

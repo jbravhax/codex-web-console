@@ -65,6 +65,35 @@ Notes:
 - WebSocket: `ws`
 - PTY: `node-pty`
 
+## Upload dependency note
+
+The server upload path is intentionally narrow:
+
+- one local-only attachment endpoint
+- in-memory single-file parsing only
+- strict size limits
+- ZIP validation and extraction safety checks after upload parsing
+
+The current server still uses `multer` `1.4.5-lts.2`. A direct upgrade to `multer` `2.x` was evaluated, and the application code path appears compatible because this project only uses `memoryStorage()` with `single("file")`.
+
+However, the upgrade is currently deferred because dependency resolution inside the Linux container failed during the install attempt with:
+
+```text
+No matching version found for forwarded@0.2.1
+```
+
+That means the remaining risk is not ignored, but explicitly isolated:
+
+- all `multer` usage is now contained in one small server upload module
+- attachment parsing remains local-only and single-route
+- upload limits stay strict
+
+Follow-up plan:
+
+1. Retry the `multer` `2.x` upgrade in a clean dependency-resolution pass.
+2. Remove `@types/multer` once the upgrade lands, if bundled types are sufficient.
+3. Re-run attachment and ZIP regression coverage after the dependency move.
+
 ## Project structure
 
 - `apps/web`: browser frontend

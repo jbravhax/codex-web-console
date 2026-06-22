@@ -184,7 +184,7 @@ export function ensureSafeZipEntryName(entryName: string): void {
     throw new Error("ZIP contains an absolute path entry, which is not allowed.");
   }
 
-  const normalized = path.posix.normalize(entryName);
+  const normalized = path.posix.normalize(entryName.replace(/\\/g, "/"));
   const segments = normalized.split("/");
   if (segments.includes("..") || normalized.startsWith("../")) {
     throw new Error("ZIP contains a path traversal entry, which is not allowed.");
