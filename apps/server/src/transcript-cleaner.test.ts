@@ -34,4 +34,12 @@ describe("stripTerminalSequences", () => {
   it("preserves meaningful text when mixed with clear-screen and overwrite artifacts", () => {
     expect(stripTerminalSequences("hello\u001b[2J\rstatus: waiting\r\u001b[2Kstatus: done\nNext")).toBe("status: done\nNext");
   });
+
+  it("applies horizontal cursor rewrites without losing the final visible text", () => {
+    expect(stripTerminalSequences("Loading 0%\u001b[2K\u001b[1GDone")).toBe("Done");
+  });
+
+  it("preserves partial visible lines while stripping surrounding control characters", () => {
+    expect(stripTerminalSequences("step 1\r\n\u0000step 2\tok\r")).toBe("step 1\nstep 2\tok");
+  });
 });

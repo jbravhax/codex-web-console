@@ -34,6 +34,7 @@ type ActiveSession = {
   repoPath: string;
   startedAt: string;
   transcriptPath: string;
+  rawTranscriptPath: string;
   metadataPath: string;
   recentOutput: string;
   isFinalized: boolean;
@@ -106,12 +107,14 @@ export class SessionManager {
     const sessionId = createSessionId();
     const sessionDir = path.join(SESSIONS_ROOT, sessionId);
     const transcriptPath = path.join(sessionDir, "transcript.txt");
+    const rawTranscriptPath = path.join(sessionDir, "transcript.raw.txt");
     const metadataPath = path.join(sessionDir, "metadata.json");
     const startedAt = new Date().toISOString();
 
     ensureSessionsRoot();
     fs.mkdirSync(sessionDir, { recursive: true });
     fs.writeFileSync(transcriptPath, "", "utf8");
+    fs.writeFileSync(rawTranscriptPath, "", "utf8");
     const config = this.getConfig();
     const ptyProcess = pty.spawn(config.codexExecutablePath, [], {
       name: "xterm-256color",
@@ -131,6 +134,7 @@ export class SessionManager {
       repoPath: validatedPath,
       startedAt,
       transcriptPath,
+      rawTranscriptPath,
       metadataPath,
       recentOutput: "",
       isFinalized: false
@@ -182,6 +186,7 @@ export class SessionManager {
       return;
     }
 
+    fs.appendFileSync(session.rawTranscriptPath, data, "utf8");
     const cleanedOutput = stripTerminalSequences(data);
     if (!cleanedOutput) {
       return;
@@ -236,9 +241,29 @@ export class SessionManager {
 
   getTranscript(sessionId: string): string | null {
     ensureSessionsRoot();
+    const rawTranscriptPath = path.join(SESSIONS_ROOT, sessionId, "transcript.raw.txt");
     const transcriptPath = path.join(SESSIONS_ROOT, sessionId, "transcript.txt");
     try {
+      if (fs.existsSync(rawTranscriptPath)) {
+        return stripTerminalSequences(fs.readFileSync(rawTranscriptPath, "utf8"));
+      }
+
       return stripTerminalSequences(fs.readFileSync(transcriptPath, "utf8"));
+    } catch {
+      return null;
+    }
+  }
+
+  getRawTranscript(sessionId: string): string | null {
+    ensureSessionsRoot();
+    const rawTranscriptPath = path.join(SESSIONS_ROOT, sessionId, "transcript.raw.txt");
+    const transcriptPath = path.join(SESSIONS_ROOT, sessionId, "transcript.txt");
+    try {
+      if (fs.existsSync(rawTranscriptPath)) {
+        return fs.readFileSync(rawTranscriptPath, "utf8");
+      }
+
+      return fs.readFileSync(transcriptPath, "utf8");
     } catch {
       return null;
     }

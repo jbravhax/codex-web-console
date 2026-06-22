@@ -63,7 +63,10 @@ export function createApp(services: AppServices) {
   });
 
   app.get("/api/sessions/:id/transcript", (request, response) => {
-    const transcript = services.sessionManager.getTranscript(request.params.id);
+    const transcript =
+      request.query.format === "raw"
+        ? services.sessionManager.getRawTranscript(request.params.id)
+        : services.sessionManager.getTranscript(request.params.id);
     if (transcript === null) {
       response.status(404).json({ error: "Session transcript not found." });
       return;

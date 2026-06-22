@@ -1,5 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { copyTranscriptText, loadSessionTranscript } from "./session-transcripts";
+import {
+  buildTranscriptMarkdown,
+  copyTranscriptText,
+  downloadRawTranscript,
+  downloadTranscriptMarkdown,
+  downloadTranscriptText,
+  loadSessionTranscript
+} from "./session-transcripts";
+import type { SessionHistoryItem } from "./app-types";
+
+const session: SessionHistoryItem = {
+  id: "session-123",
+  repoPath: "/workspace/example-repo",
+  startTime: "2026-06-21T12:00:00.000Z",
+  endTime: "2026-06-21T12:05:00.000Z",
+  durationMs: 300000
+};
 
 beforeEach(() => {
   vi.stubGlobal("navigator", {
@@ -18,6 +34,18 @@ describe("session transcript helpers", () => {
 
     await expect(loadSessionTranscript("session-123", fetchImpl as never)).resolves.toBe("codex transcript output");
     expect(fetchImpl).toHaveBeenCalledWith("/api/sessions/session-123/transcript");
+  });
+
+  it("loads raw transcript text from the raw transcript endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      text: vi.fn().mockResolvedValue("\u001b[31mraw terminal output")
+    });
+
+    await expect(loadSessionTranscript("session-123", "raw", fetchImpl as never)).resolves.toBe(
+      "\u001b[31mraw terminal output"
+    );
+    expect(fetchImpl).toHaveBeenCalledWith("/api/sessions/session-123/transcript?format=raw");
   });
 
   it("surfaces transcript endpoint errors gracefully", async () => {
@@ -86,5 +114,44 @@ describe("session transcript helpers", () => {
       code: "copy-failed",
       clipboardBlocked: true
     });
+  });
+
+  it("builds a markdown export with session metadata and transcript content", () => {
+    const markdown = buildTranscriptMarkdown(session, "codex transcript output");
+
+    expect(markdown).toContain("# Codex Session Transcript");
+    expect(markdown).toContain("- Repo path: /workspace/example-repo");
+    expect(markdown).toContain("```text");
+    expect(markdown).toContain("codex transcript output");
+  });
+
+  it("downloads cleaned transcript and raw transcript variants", () => {
+    const anchor = {
+      href: "",
+      download: "",
+      style: {} as CSSStyleDeclaration,
+      click: vi.fn()
+    } as unknown as HTMLAnchorElement;
+    const doc = {
+      body: {
+        appendChild: vi.fn(),
+        removeChild: vi.fn()
+      },
+      createElement: vi.fn().mockReturnValue(anchor)
+    } as unknown as Document;
+    const urlFactory = {
+      createObjectURL: vi.fn().mockReturnValue("blob:transcript"),
+      revokeObjectURL: vi.fn()
+    } as unknown as typeof URL;
+
+    downloadTranscriptText(session, "clean transcript", doc, urlFactory);
+    expect(anchor.download).toContain("session-123.txt");
+    expect(anchor.click).toHaveBeenCalledTimes(1);
+
+    downloadTranscriptMarkdown(session, "clean transcript", doc, urlFactory);
+    expect(anchor.download).toContain("session-123.md");
+
+    downloadRawTranscript(session, "\u001b[31mraw", doc, urlFactory);
+    expect(anchor.download).toContain("session-123-raw.txt");
   });
 });

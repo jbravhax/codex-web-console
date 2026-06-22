@@ -40,6 +40,10 @@ export function stripTerminalSequences(input: string): string {
     currentLine = currentLine.slice(0, cursor);
   };
 
+  const moveCursorHorizontally = (position: number) => {
+    cursor = Math.max(0, position);
+  };
+
   const skipEscapeSequence = (
     startIndex: number
   ): {
@@ -63,6 +67,16 @@ export function stripTerminalSequences(input: string): string {
               return {
                 nextIndex: index + 1,
                 apply: () => clearLine(mode)
+              };
+            }
+          }
+
+          if (finalCharacter === "G") {
+            const column = params === "" ? 1 : Number.parseInt(params, 10);
+            if (Number.isFinite(column) && column > 0) {
+              return {
+                nextIndex: index + 1,
+                apply: () => moveCursorHorizontally(column - 1)
               };
             }
           }

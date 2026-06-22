@@ -36,6 +36,7 @@ export type SessionHistoryItem = {
 export type TranscriptViewerState = {
   session: SessionHistoryItem | null;
   transcript: string;
+  rawTranscript: string;
   isLoading: boolean;
   error: string;
 };
@@ -144,6 +145,9 @@ export type SessionHistoryPanelProps = {
   transcriptViewer: TranscriptViewerState;
   onViewTranscript(session: SessionHistoryItem): void;
   onCopyTranscript(): void;
+  onDownloadTranscriptText(): void;
+  onDownloadTranscriptMarkdown(): void;
+  onDownloadRawTranscript(): void;
   formatDuration(durationMs: number | null): string;
 };
 

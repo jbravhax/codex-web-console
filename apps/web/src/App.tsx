@@ -55,7 +55,13 @@ import {
 } from "./pending-context";
 import { createInitialSessionBanner, reduceSessionBanner, type SessionBanner } from "./session-banner";
 import { buildSessionWebSocketUrl } from "./session-connection";
-import { copyTranscriptText, loadSessionTranscript } from "./session-transcripts";
+import {
+  copyTranscriptText,
+  downloadRawTranscript,
+  downloadTranscriptMarkdown,
+  downloadTranscriptText,
+  loadSessionTranscript
+} from "./session-transcripts";
 import { buildSubmittedPromptInput, detectTerminalOutputState } from "./terminal-session";
 import { buildSessionErrorDisplay, buildUnexpectedExitDisplay, isStructuredSessionFailure } from "./session-diagnostics";
 import { friendlyUploadErrorMessage } from "./ui-messages";
@@ -140,6 +146,7 @@ export function App() {
   const [transcriptViewer, setTranscriptViewer] = useState<TranscriptViewerState>({
     session: null,
     transcript: "",
+    rawTranscript: "",
     isLoading: false,
     error: ""
   });
@@ -849,6 +856,7 @@ export function App() {
     setTranscriptViewer({
       session,
       transcript: "",
+      rawTranscript: "",
       isLoading: true,
       error: ""
     });
@@ -858,6 +866,7 @@ export function App() {
       setTranscriptViewer({
         session,
         transcript,
+        rawTranscript: "",
         isLoading: false,
         error: ""
       });
@@ -865,6 +874,7 @@ export function App() {
       setTranscriptViewer({
         session,
         transcript: "",
+        rawTranscript: "",
         isLoading: false,
         error: toErrorMessage(requestError, "Could not load transcript.")
       });
@@ -881,6 +891,45 @@ export function App() {
       setCopyFeedback("the transcript", result);
     } catch (copyError) {
       setClipboardFailure("the transcript", copyError);
+    }
+  };
+
+  const downloadLoadedTranscriptText = () => {
+    if (!transcriptViewer.session || !transcriptViewer.transcript) {
+      return;
+    }
+
+    downloadTranscriptText(transcriptViewer.session, transcriptViewer.transcript);
+    setContextMessage("Downloaded the cleaned transcript as a text file.");
+    setError("");
+  };
+
+  const downloadLoadedTranscriptMarkdown = () => {
+    if (!transcriptViewer.session || !transcriptViewer.transcript) {
+      return;
+    }
+
+    downloadTranscriptMarkdown(transcriptViewer.session, transcriptViewer.transcript);
+    setContextMessage("Downloaded the cleaned transcript as a markdown file.");
+    setError("");
+  };
+
+  const downloadLoadedRawTranscript = async () => {
+    if (!transcriptViewer.session) {
+      return;
+    }
+
+    try {
+      const rawTranscript =
+        transcriptViewer.rawTranscript || (await loadSessionTranscript(transcriptViewer.session.id, "raw"));
+      setTranscriptViewer((current) =>
+        current.session?.id === transcriptViewer.session?.id ? { ...current, rawTranscript } : current
+      );
+      downloadRawTranscript(transcriptViewer.session, rawTranscript);
+      setContextMessage("Downloaded the raw terminal transcript for debugging.");
+      setError("");
+    } catch (requestError) {
+      setError(toErrorMessage(requestError, "Could not download the raw transcript."));
     }
   };
 
@@ -1013,6 +1062,11 @@ export function App() {
             },
             onCopyTranscript: () => {
               void copyLoadedTranscript();
+            },
+            onDownloadTranscriptText: downloadLoadedTranscriptText,
+            onDownloadTranscriptMarkdown: downloadLoadedTranscriptMarkdown,
+            onDownloadRawTranscript: () => {
+              void downloadLoadedRawTranscript();
             },
             formatDuration
           }}

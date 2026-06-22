@@ -104,7 +104,9 @@ describe("SessionManager", () => {
 
     expect(manager.getStatus("owner-1")).toEqual({ active: false, repoPath: null });
     expect(fs.existsSync(session.transcriptPath)).toBe(true);
+    expect(fs.existsSync(session.rawTranscriptPath)).toBe(true);
     expect(fs.readFileSync(session.transcriptPath, "utf8")).toBe("hello from codex");
+    expect(fs.readFileSync(session.rawTranscriptPath, "utf8")).toBe("hello from codex");
     expect(JSON.parse(fs.readFileSync(session.metadataPath, "utf8"))).toMatchObject({
       id: session.sessionId,
       repoPath,
@@ -128,6 +130,9 @@ describe("SessionManager", () => {
     manager.clear("owner-clean-transcript");
 
     expect(fs.readFileSync(session.transcriptPath, "utf8")).toBe("Error\nCreated README.md");
+    expect(fs.readFileSync(session.rawTranscriptPath, "utf8")).toBe("\u001b[31mError\u001b[39m\n\u001b[2J\u001b[1;1HCreated README.md");
+    expect(manager.getTranscript(session.sessionId)).toBe("Error\nCreated README.md");
+    expect(manager.getRawTranscript(session.sessionId)).toBe("\u001b[31mError\u001b[39m\n\u001b[2J\u001b[1;1HCreated README.md");
   });
 
   it("ignores transcript writes after a session is cleared", () => {

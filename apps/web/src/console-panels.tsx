@@ -603,6 +603,9 @@ export function SessionHistoryPanel({
   transcriptViewer,
   onViewTranscript,
   onCopyTranscript,
+  onDownloadTranscriptText,
+  onDownloadTranscriptMarkdown,
+  onDownloadRawTranscript,
   formatDuration
 }: SessionHistoryPanelProps) {
   return (
@@ -657,10 +660,34 @@ export function SessionHistoryPanel({
               >
                 Copy transcript
               </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={onDownloadTranscriptText}
+                disabled={!transcriptViewer.transcript}
+              >
+                Download .txt
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={onDownloadTranscriptMarkdown}
+                disabled={!transcriptViewer.transcript}
+              >
+                Download .md
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={onDownloadRawTranscript}
+                disabled={transcriptViewer.isLoading || !transcriptViewer.session}
+              >
+                Download raw
+              </button>
             </div>
           </div>
           <p className="transcript-helper-text">
-            Cleaned transcript output preserves the readable session flow while removing terminal control noise.
+            Cleaned transcript output preserves the readable session flow while removing terminal control noise. Raw terminal output is still available for debugging when needed.
           </p>
           {transcriptViewer.isLoading ? <p className="history-empty">Loading transcript...</p> : null}
           {!transcriptViewer.isLoading && transcriptViewer.error ? <p className="history-empty">{transcriptViewer.error}</p> : null}
