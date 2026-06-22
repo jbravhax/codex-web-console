@@ -1,15 +1,53 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const PROJECT_HINT_FILES = [".git", "package.json", "pyproject.toml", "Cargo.toml", "README.md"];
+const PROJECT_MARKERS = [
+  ".git",
+  "package.json",
+  "pnpm-lock.yaml",
+  "package-lock.json",
+  "yarn.lock",
+  "Cargo.toml",
+  "pyproject.toml",
+  "requirements.txt",
+  "go.mod",
+  "pom.xml",
+  "build.gradle",
+  ".github/workflows",
+  "README.md"
+] as const;
 const DANGEROUS_PATHS = new Set(["/", "/etc", "/bin", "/usr", "/var", "/root"]);
 
 type ValidatePathOptions = {
   requireProjectHint: boolean;
 };
 
+export type ProjectDirectoryKind =
+  | "git-repository"
+  | "source-project"
+  | "broad-parent-folder"
+  | "empty-folder"
+  | "directory"
+  | "file"
+  | "missing"
+  | "inaccessible";
+
+export type ProjectDirectoryProfile = {
+  kind: ProjectDirectoryKind;
+  resolvedPath: string;
+  markers: string[];
+  childProjectCount: number;
+  childDirectoryCount: number;
+  isGitRepository: boolean;
+  isEmpty: boolean;
+};
+
+function detectProjectMarkers(directoryPath: string): string[] {
+  return PROJECT_MARKERS.filter((entry) => fs.existsSync(path.join(directoryPath, entry)));
+}
+
 function hasProjectHint(directoryPath: string): boolean {
-  return PROJECT_HINT_FILES.some((entry) => fs.existsSync(path.join(directoryPath, entry)));
+  return detectProjectMarkers(directoryPath).length > 0;
 }
 
 function isInsideDangerousPath(normalizedPath: string): boolean {
@@ -27,6 +65,7 @@ function isInsideDangerousPath(normalizedPath: string): boolean {
 }
 
 function looksLikeBroadParentDirectory(directoryPath: string): boolean {
+  const currentMarkers = detectProjectMarkers(directoryPath);
   let childEntries: fs.Dirent[];
 
   try {
@@ -42,7 +81,97 @@ function looksLikeBroadParentDirectory(directoryPath: string): boolean {
 
   const childProjectDirectories = childDirectories.filter((entry) => hasProjectHint(path.join(directoryPath, entry.name)));
 
+  if (currentMarkers.length > 0) {
+    return false;
+  }
+
   return childProjectDirectories.length > 0 || childDirectories.length >= 3;
+}
+
+export function classifyProjectDirectory(inputPath: string): ProjectDirectoryProfile {
+  const trimmedPath = inputPath.trim();
+  const resolvedPath = path.resolve(trimmedPath || ".");
+
+  if (!trimmedPath || !fs.existsSync(resolvedPath)) {
+    return {
+      kind: "missing",
+      resolvedPath,
+      markers: [],
+      childProjectCount: 0,
+      childDirectoryCount: 0,
+      isGitRepository: false,
+      isEmpty: false
+    };
+  }
+
+  let stats: fs.Stats;
+  try {
+    stats = fs.statSync(resolvedPath);
+  } catch {
+    return {
+      kind: "inaccessible",
+      resolvedPath,
+      markers: [],
+      childProjectCount: 0,
+      childDirectoryCount: 0,
+      isGitRepository: false,
+      isEmpty: false
+    };
+  }
+
+  if (!stats.isDirectory()) {
+    return {
+      kind: "file",
+      resolvedPath,
+      markers: [],
+      childProjectCount: 0,
+      childDirectoryCount: 0,
+      isGitRepository: false,
+      isEmpty: false
+    };
+  }
+
+  let childEntries: fs.Dirent[];
+  try {
+    childEntries = fs.readdirSync(resolvedPath, { withFileTypes: true });
+  } catch {
+    return {
+      kind: "inaccessible",
+      resolvedPath,
+      markers: [],
+      childProjectCount: 0,
+      childDirectoryCount: 0,
+      isGitRepository: false,
+      isEmpty: false
+    };
+  }
+
+  const markers = detectProjectMarkers(resolvedPath);
+  const childDirectories = childEntries.filter((entry) => entry.isDirectory());
+  const childProjectCount = childDirectories.filter((entry) => hasProjectHint(path.join(resolvedPath, entry.name))).length;
+  const isGitRepository = markers.includes(".git");
+  const isEmpty = childEntries.length === 0;
+
+  let kind: ProjectDirectoryKind = "directory";
+  if (isEmpty) {
+    kind = "empty-folder";
+  } else if (isGitRepository) {
+    kind = "git-repository";
+  } else if (markers.length > 0) {
+    kind = "source-project";
+  } else if (childProjectCount > 0 || childDirectories.length >= 3) {
+    kind = "broad-parent-folder";
+  }
+
+  return {
+    kind,
+    resolvedPath,
+    markers,
+    childProjectCount,
+    childDirectoryCount: childDirectories.length,
+    isGitRepository,
+    isEmpty
+  };
 }
 
 function validateSafeDirectoryPath(inputPath: string, options: ValidatePathOptions): string {
@@ -66,27 +195,30 @@ function validateSafeDirectoryPath(inputPath: string, options: ValidatePathOptio
     throw new Error(`The path does not exist: ${resolvedPath}`);
   }
 
-  let stats: fs.Stats;
-  try {
-    stats = fs.statSync(resolvedPath);
-  } catch {
+  const profile = classifyProjectDirectory(trimmedPath);
+  if (profile.kind === "inaccessible") {
     throw new Error(`Could not inspect the path: ${resolvedPath}`);
   }
 
-  if (!stats.isDirectory()) {
+  if (profile.kind === "file") {
     throw new Error(`The path is not a directory: ${resolvedPath}`);
   }
 
-  const directoryHasProjectHint = hasProjectHint(resolvedPath);
-  if (options.requireProjectHint && !directoryHasProjectHint) {
-    if (looksLikeBroadParentDirectory(resolvedPath)) {
+  if (options.requireProjectHint && (profile.kind === "directory" || profile.kind === "empty-folder" || profile.kind === "broad-parent-folder")) {
+    if (profile.kind === "broad-parent-folder") {
       throw new Error(
         "That folder looks like a broad parent directory that contains multiple projects. Open one specific project folder inside it instead."
       );
     }
 
+    if (profile.kind === "empty-folder") {
+      throw new Error(
+        "That folder is empty. Choose an existing project folder, or use Create new project here before starting Codex."
+      );
+    }
+
     throw new Error(
-      "That folder does not look like a project yet. Start in a folder that already contains project files such as .git, README.md, package.json, pyproject.toml, or Cargo.toml."
+      "That folder does not look like a project yet. Start in a folder that already contains project files such as .git, package.json, pyproject.toml, Cargo.toml, go.mod, pom.xml, build.gradle, or README.md."
     );
   }
 

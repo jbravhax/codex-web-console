@@ -71,6 +71,29 @@ export type AppSettings = {
   theme: ThemeSetting;
 };
 
+export type ReadinessCheckStatus = "passed" | "warning" | "failed";
+
+export type ReadinessCheck = {
+  key:
+    | "codex-executable"
+    | "git-executable"
+    | "project-folder"
+    | "project-access"
+    | "bubblewrap"
+    | "user-namespaces";
+  status: ReadinessCheckStatus;
+  message: string;
+  recommendedAction: string;
+};
+
+export type ReadinessSummary = {
+  overallStatus: ReadinessCheckStatus;
+  canStart: boolean;
+  checkedAt: string;
+  repoPath: string;
+  items: ReadinessCheck[];
+};
+
 export type GitStatusSummary = {
   repoPath: string;
   isGitRepo: boolean;
@@ -103,6 +126,9 @@ export type ProjectControlsProps = {
   connectionStateLabel: string;
   defaultRepoRoot: string;
   isLoadingSettings: boolean;
+  readiness: ReadinessSummary | null;
+  isLoadingReadiness: boolean;
+  onRefreshReadiness(): void;
   recentProjects: RecentProjectItem[];
   isLoadingRecentProjects: boolean;
 };

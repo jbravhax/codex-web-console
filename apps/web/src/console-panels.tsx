@@ -42,6 +42,17 @@ function formatZipSkipReason(reason: string): string {
   }
 }
 
+function formatReadinessStatusLabel(status: "passed" | "warning" | "failed"): string {
+  switch (status) {
+    case "passed":
+      return "Passed";
+    case "warning":
+      return "Warning";
+    case "failed":
+      return "Failed";
+  }
+}
+
 function buildTerminalGuidance(sessionBanner: SessionBanner): string | null {
   if (sessionBanner.state === "awaiting-approval") {
     return "Codex is waiting for approval in the terminal. Approve in the terminal and work will continue automatically. Press Enter there to approve or Esc to cancel.";
@@ -172,6 +183,9 @@ export function ProjectControls({
   connectionStateLabel,
   defaultRepoRoot,
   isLoadingSettings,
+  readiness,
+  isLoadingReadiness,
+  onRefreshReadiness,
   recentProjects,
   isLoadingRecentProjects
 }: ProjectControlsProps) {
@@ -194,18 +208,58 @@ export function ProjectControls({
           placeholder={defaultRepoRoot || "/home/you/project"}
         />
         <button type="button" className="secondary" onClick={onChooseRepo}>
-          Choose repo
+          Use browser picker
         </button>
       </div>
       <p className="helper-text">
-        Paste the full path to one real project folder here. Manual path entry is fully supported, and some browsers cannot share a usable absolute folder path from the picker.
+        Best results come from pasting the full path to one real project folder here. Manual path entry is fully supported and remains the primary way to choose a project.
       </p>
-      <p className="helper-text">Good examples: `/home/you/my-app` or `/home/you/projects/api-service`. Avoid broad parent folders like `/home/you/Projects`.</p>
+      <p className="helper-text">
+        Good examples: `/home/you/my-app` or `/home/you/projects/api-service`. Avoid broad parent folders like `/home/you/Projects`. The browser picker is only a convenience, and some browsers cannot share a usable absolute path from it.
+      </p>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
+      <div className="readiness-card">
+        <div className="readiness-card-header">
+          <div>
+            <strong>Environment readiness</strong>
+            <p className="helper-text">
+              These checks run before session start so common setup problems are easier to catch early.
+            </p>
+          </div>
+          <button type="button" className="ghost" onClick={onRefreshReadiness} disabled={!repoPath.trim() || isLoadingReadiness}>
+            {isLoadingReadiness ? "Checking..." : "Refresh"}
+          </button>
+        </div>
+        {!repoPath.trim() ? (
+          <p className="helper-text">Enter one real project folder to run readiness checks.</p>
+        ) : isLoadingReadiness ? (
+          <p className="helper-text">Checking Codex, Git, project access, and Linux sandbox readiness...</p>
+        ) : readiness ? (
+          <>
+            <div className={`readiness-overall readiness-${readiness.overallStatus}`}>
+              <strong>{formatReadinessStatusLabel(readiness.overallStatus)}</strong>
+              <span>{readiness.canStart ? "This project can start a session." : "Fix the failed items below before starting a session."}</span>
+            </div>
+            <div className="readiness-list">
+              {readiness.items.map((item) => (
+                <article key={item.key} className={`readiness-item readiness-${item.status}`}>
+                  <div className="readiness-item-header">
+                    <strong>{item.message}</strong>
+                    <span className="section-chip">{formatReadinessStatusLabel(item.status)}</span>
+                  </div>
+                  <p className="helper-text">{item.recommendedAction}</p>
+                </article>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="helper-text">Could not run readiness checks yet. Try refreshing after you choose a project folder.</p>
+        )}
+      </div>
       <div className="project-create-card">
         <div className="project-create-header">
-          <strong>Create new project</strong>
-          <span className="helper-text">Use the same path above to make a new folder before starting Codex.</span>
+          <strong>Create new project here</strong>
+          <span className="helper-text">Use this only when the path above is meant to become a brand-new project folder.</span>
         </div>
         <label className="checkbox-row">
           <input

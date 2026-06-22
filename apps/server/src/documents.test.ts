@@ -72,6 +72,7 @@ describe("POST /api/documents", () => {
 
   it("rejects invalid repo paths", async () => {
     const repoPath = makeTempDir("codex-web-invalid-");
+    fs.writeFileSync(path.join(repoPath, "notes.txt"), "hello\n", "utf8");
     const app = createApp(createServices(makeConfig()));
 
     const response = await request(app).post("/api/documents").send({

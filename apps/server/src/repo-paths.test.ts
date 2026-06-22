@@ -2,7 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { validateInspectableDirectoryPath, validateNewProjectPath, validateRepoPath } from "./repo-paths.js";
+import {
+  classifyProjectDirectory,
+  validateInspectableDirectoryPath,
+  validateNewProjectPath,
+  validateRepoPath
+} from "./repo-paths.js";
 
 const createdPaths: string[] = [];
 
@@ -19,6 +24,51 @@ afterEach(() => {
 });
 
 describe("repo path validation", () => {
+  it("classifies a Git repository using .git markers", () => {
+    const repoPath = makeTempDir("codex-web-git-profile-");
+    fs.mkdirSync(path.join(repoPath, ".git"));
+    fs.writeFileSync(path.join(repoPath, "package.json"), "{}\n", "utf8");
+
+    expect(classifyProjectDirectory(repoPath)).toMatchObject({
+      kind: "git-repository",
+      isGitRepository: true
+    });
+  });
+
+  it("classifies a source project folder using common project markers", () => {
+    const repoPath = makeTempDir("codex-web-source-profile-");
+    fs.writeFileSync(path.join(repoPath, "go.mod"), "module example.com/app\n", "utf8");
+
+    expect(classifyProjectDirectory(repoPath)).toMatchObject({
+      kind: "source-project",
+      markers: ["go.mod"]
+    });
+  });
+
+  it("classifies an empty folder separately from a generic directory", () => {
+    const repoPath = makeTempDir("codex-web-empty-profile-");
+
+    expect(classifyProjectDirectory(repoPath)).toMatchObject({
+      kind: "empty-folder",
+      isEmpty: true
+    });
+  });
+
+  it("classifies a broad parent folder that contains child projects", () => {
+    const directoryPath = makeTempDir("codex-web-parent-profile-");
+    const apiService = path.join(directoryPath, "api-service");
+    const workerService = path.join(directoryPath, "worker-service");
+    fs.mkdirSync(apiService);
+    fs.mkdirSync(workerService);
+    fs.writeFileSync(path.join(apiService, "package-lock.json"), "{}\n", "utf8");
+    fs.writeFileSync(path.join(workerService, "pyproject.toml"), "[project]\nname='worker'\n", "utf8");
+
+    expect(classifyProjectDirectory(directoryPath)).toMatchObject({
+      kind: "broad-parent-folder",
+      childProjectCount: 2
+    });
+  });
+
   it("accepts a project directory with a project hint", () => {
     const repoPath = makeTempDir("codex-web-repo-path-");
     fs.writeFileSync(path.join(repoPath, "README.md"), "# Example\n", "utf8");
@@ -34,8 +84,15 @@ describe("repo path validation", () => {
 
   it("rejects missing project hints for repo startup", () => {
     const directoryPath = makeTempDir("codex-web-no-hint-");
+    fs.writeFileSync(path.join(directoryPath, "notes.txt"), "hello\n", "utf8");
 
     expect(() => validateRepoPath(directoryPath)).toThrow("does not look like a project");
+  });
+
+  it("rejects empty folders for repo startup with create-project guidance", () => {
+    const directoryPath = makeTempDir("codex-web-empty-start-");
+
+    expect(() => validateRepoPath(directoryPath)).toThrow("That folder is empty");
   });
 
   it("rejects broad parent folders that contain multiple projects", () => {

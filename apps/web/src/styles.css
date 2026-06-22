@@ -217,6 +217,81 @@ textarea {
   color: var(--muted);
 }
 
+.readiness-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.readiness-card-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.readiness-card-header strong,
+.readiness-overall strong,
+.readiness-item-header strong {
+  display: block;
+}
+
+.readiness-overall {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.readiness-overall span {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.readiness-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.readiness-item {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.readiness-item .helper-text {
+  margin: 0;
+}
+
+.readiness-item-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.readiness-passed {
+  border-color: rgba(52, 211, 153, 0.28);
+}
+
+.readiness-warning {
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.readiness-failed {
+  border-color: rgba(248, 113, 113, 0.28);
+}
+
 .session-banner-metadata {
   display: flex;
   flex-wrap: wrap;

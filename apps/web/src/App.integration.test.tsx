@@ -116,6 +116,7 @@ function installFetchMock(overrides?: {
   recentProjects?: unknown;
   sessions?: unknown;
   gitStatus?: unknown;
+  readiness?: unknown;
   documents?: { ok: boolean; payload: unknown };
   projects?: { ok: boolean; payload: unknown };
 }) {
@@ -149,6 +150,31 @@ function installFetchMock(overrides?: {
           changedFilesCount: 1,
           stagedFilesCount: 0,
           untrackedFilesCount: 0
+        }
+      );
+    }
+
+    if (input.startsWith("/api/readiness?repoPath=")) {
+      return createFetchResponse(
+        overrides?.readiness ?? {
+          overallStatus: "passed",
+          canStart: true,
+          checkedAt: "2026-06-22T21:00:00.000Z",
+          repoPath: "/workspace/default-project",
+          items: [
+            {
+              key: "codex-executable",
+              status: "passed",
+              message: "Codex is available as codex.",
+              recommendedAction: "No action needed."
+            },
+            {
+              key: "git-executable",
+              status: "passed",
+              message: "Git is available for repo status, diffs, and Git setup.",
+              recommendedAction: "No action needed."
+            }
+          ]
         }
       );
     }
@@ -189,6 +215,7 @@ function renderApp(options?: {
   recentProjects?: unknown;
   sessions?: unknown;
   gitStatus?: unknown;
+  readiness?: unknown;
   documents?: { ok: boolean; payload: unknown };
   projects?: { ok: boolean; payload: unknown };
 }) {
@@ -246,10 +273,45 @@ describe("App integration", () => {
 
     renderApp();
 
-    fireEvent.click(screen.getByRole("button", { name: "Choose repo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use browser picker" }));
 
     expect(await screen.findByText(REPO_PICKER_UNSUPPORTED_MESSAGE)).toBeTruthy();
-    expect(screen.getByText(/Manual path entry is fully supported/i)).toBeTruthy();
+    expect(screen.getByText(/Manual path entry is fully supported and remains the primary way/i)).toBeTruthy();
+  });
+
+  it("shows environment readiness details for the selected project", async () => {
+    renderApp({
+      readiness: {
+        overallStatus: "warning",
+        canStart: true,
+        checkedAt: "2026-06-22T21:00:00.000Z",
+        repoPath: "/workspace/default-project",
+        items: [
+          {
+            key: "codex-executable",
+            status: "passed",
+            message: "Codex is available as codex.",
+            recommendedAction: "No action needed."
+          },
+          {
+            key: "git-executable",
+            status: "warning",
+            message: "Git is not available on this machine right now.",
+            recommendedAction: "Install Git if you want repo status, diff inspection, or Git initialization from the app."
+          }
+        ]
+      }
+    });
+
+    fireEvent.change(screen.getByLabelText("Project folder path"), {
+      target: {
+        value: "/workspace/default-project"
+      }
+    });
+
+    expect(await screen.findByText("Environment readiness")).toBeTruthy();
+    expect(await screen.findByText("Git is not available on this machine right now.")).toBeTruthy();
+    expect(screen.getByText("This project can start a session.")).toBeTruthy();
   });
 
   it("creates a new project folder and reuses the chosen path for session start", async () => {
@@ -278,7 +340,7 @@ describe("App integration", () => {
       }
     });
     fireEvent.click(screen.getByRole("button", { name: "Start session" }));
-    expect(screen.getByText("Starting session")).toBeTruthy();
+    expect(await screen.findByText("Starting session")).toBeTruthy();
     expect(await screen.findByText("Started at")).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
@@ -296,6 +358,66 @@ describe("App integration", () => {
     });
 
     expect(await screen.findByText("Session stopped")).toBeTruthy();
+  });
+
+  it("blocks session start when readiness reports a hard failure", async () => {
+    const socket = renderApp({
+      readiness: {
+        overallStatus: "failed",
+        canStart: false,
+        checkedAt: "2026-06-22T21:00:00.000Z",
+        repoPath: "/workspace/missing-project",
+        items: [
+          {
+            key: "project-folder",
+            status: "failed",
+            message: "That project folder does not exist yet.",
+            recommendedAction: "Create it first, then choose that specific project folder again."
+          }
+        ]
+      }
+    });
+
+    fireEvent.change(screen.getByLabelText("Project folder path"), {
+      target: {
+        value: "/workspace/missing-project"
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start session" }));
+
+    expect((await screen.findAllByText("That project folder does not exist yet.")).length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText(/Next step: Create it first/i)).toBeTruthy();
+    expect(socket.sent).not.toContain(JSON.stringify({ type: "start", repoPath: "/workspace/missing-project" }));
+  });
+
+  it("shows parent-folder guidance before session start when the chosen path looks too broad", async () => {
+    renderApp({
+      readiness: {
+        overallStatus: "failed",
+        canStart: false,
+        checkedAt: "2026-06-22T21:00:00.000Z",
+        repoPath: "/workspace/Projects",
+        items: [
+          {
+            key: "project-folder",
+            status: "failed",
+            message:
+              "That folder looks like a broad parent directory that contains multiple projects. Open one specific project folder inside it instead.",
+            recommendedAction:
+              "This looks like a parent folder. Choose the specific project folder you want Codex to work in."
+          }
+        ]
+      }
+    });
+
+    fireEvent.change(screen.getByLabelText("Project folder path"), {
+      target: {
+        value: "/workspace/Projects"
+      }
+    });
+
+    expect(await screen.findByText(/broad parent directory/i)).toBeTruthy();
+    expect(await screen.findByText(/choose the specific project folder you want codex to work in/i)).toBeTruthy();
   });
 
   it("shows the generated prompt preview when expanded", async () => {

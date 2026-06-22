@@ -18,6 +18,7 @@ All of these inputs appear together in one pending-context area in the UI so you
 - A wrapper that runs Codex as a normal local terminal process
 - A browser UI for starting a session, sending input, and viewing output
 - A browser UI that keeps session state visible, including approval waits, completion, disconnects, and failures
+- A browser UI that runs lightweight readiness checks before session start so setup problems are easier to spot
 - A local-only tool intended to run on the same Linux machine as Codex
 - A small TypeScript monorepo with a React frontend and Express backend
 
@@ -355,15 +356,18 @@ You can choose a repo in three ways:
 
 - Paste a repo path manually
 - Reuse a recent project from the recent-projects list
-- Use the `Choose repo` button when the browser supports the File System Access API
+- Use the `Use browser picker` button when the browser supports the File System Access API
 
 Notes:
 
+- Manual path entry is the primary and most reliable option.
 - The browser picker uses `window.showDirectoryPicker()` when available.
 - Some browsers let you pick a folder but do not expose a usable absolute filesystem path back to the page.
 - When that happens, the app does not guess or fake a path. It tells you to paste the project folder path manually instead.
 - Manual path entry remains available in every browser.
 - Codex still needs one real project folder, not a broad parent directory such as `/home/you/Projects`.
+- Before session start, the app tries to classify the chosen folder as a Git repository, source project folder, broad parent folder, empty folder, or invalid/inaccessible path.
+- Common project markers include `.git`, `package.json`, `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `Cargo.toml`, `pyproject.toml`, `requirements.txt`, `go.mod`, `pom.xml`, `build.gradle`, `.github/workflows`, and `README.md`.
 
 ## Safety limits
 
@@ -393,6 +397,7 @@ The UI summarizes skipped files in human-readable language so you can tell what 
 - `GET /api/settings`
 - `POST /api/settings`
 - `GET /api/recent-projects`
+- `GET /api/readiness?repoPath=`
 - `GET /api/sessions`
 - `GET /api/sessions/:id/transcript`
 - `GET /api/git/status?repoPath=`
@@ -404,6 +409,8 @@ The UI summarizes skipped files in human-readable language so you can tell what 
 ## Security model
 
 This project is intentionally local-only and keeps its defaults conservative, but it is still a powerful developer tool.
+
+Before the app starts a Codex session, it runs lightweight readiness checks for the configured Codex executable, Git availability, the selected project folder, and Linux sandbox prerequisites when they can be detected safely. Warnings stay informational. Hard failures prevent session launch until you fix them.
 
 Key points:
 
@@ -447,6 +454,7 @@ Check:
 - the selected repo path exists
 - the selected path is a directory
 - the selected path looks like a project directory
+- the project card's readiness checks do not show failed items
 
 ### Codex does not start correctly on Linux
 
@@ -455,6 +463,7 @@ Check:
 - Codex CLI works directly in a terminal
 - `bubblewrap` is installed and available as `bwrap`
 - the current Linux environment supports the sandbox setup Codex expects
+- Linux user namespaces are enabled if the readiness checks warn about sandbox setup
 
 ### The browser cannot connect
 

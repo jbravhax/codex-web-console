@@ -5,6 +5,7 @@ import { savePastedDocument } from "./documents.js";
 import { getGitDiff } from "./git-diff.js";
 import { getGitStatus } from "./git-status.js";
 import { createRecentProjectsStore } from "./recent-projects.js";
+import { runEnvironmentReadinessChecks } from "./readiness.js";
 import { createProject } from "./projects.js";
 import { SessionManager } from "./session.js";
 import { handleUploadMiddlewareError, type AttachmentUploadRequest, uploadSingleAttachment } from "./upload-middleware.js";
@@ -76,6 +77,16 @@ export function createApp(services: AppServices) {
     response.json({
       items: services.recentProjects.listRecentProjects()
     });
+  });
+
+  app.get("/api/readiness", (request, response) => {
+    try {
+      const repoPath = readString(request.query.repoPath);
+      const readiness = runEnvironmentReadinessChecks(services.getConfig(), repoPath);
+      response.json(readiness);
+    } catch (error) {
+      sendBadRequest(response, "Could not run environment checks.", error);
+    }
   });
 
   app.post("/api/settings", (request, response) => {

@@ -18,6 +18,7 @@ import type {
   DiffViewerState,
   GitStatusSummary,
   RecentProjectItem,
+  ReadinessSummary,
   ServerMessage,
   SessionActivitySummary,
   SessionHistoryItem,
@@ -68,6 +69,7 @@ import {
 import { buildSubmittedPromptInput, detectTerminalOutputState } from "./terminal-session";
 import { buildSessionErrorDisplay, buildUnexpectedExitDisplay, isStructuredSessionFailure } from "./session-diagnostics";
 import { friendlyUploadErrorMessage } from "./ui-messages";
+import { loadReadiness } from "./readiness";
 
 const DEFAULT_SETTINGS: AppSettings = {
   codexExecutablePath: "codex",
@@ -142,6 +144,7 @@ export function App() {
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(true);
   const [isLoadingGitStatus, setIsLoadingGitStatus] = useState(false);
+  const [isLoadingReadiness, setIsLoadingReadiness] = useState(false);
   const [diffViewer, setDiffViewer] = useState<DiffViewerState>({
     diff: null,
     isLoading: false,
@@ -166,6 +169,7 @@ export function App() {
     disconnectedAt: null,
     failedAt: null
   });
+  const [readiness, setReadiness] = useState<ReadinessSummary | null>(null);
 
   const readyPendingItemCount = countReadyPendingContextItems(pendingContextItems);
   const pendingContextPreviewLines = buildPendingContextPreview(pendingContextItems);
@@ -187,6 +191,42 @@ export function App() {
 
   const setClipboardFailure = (subject: string, copyError: unknown) => {
     setError(buildCopyFailureMessage(subject, copyError));
+  };
+
+  const runReadinessChecks = async (pathToCheck: string) => {
+    const normalizedPath = pathToCheck.trim();
+    if (!normalizedPath) {
+      setReadiness(null);
+      setIsLoadingReadiness(false);
+      return null;
+    }
+
+    setIsLoadingReadiness(true);
+
+    try {
+      const nextReadiness = await loadReadiness(normalizedPath);
+      setReadiness(nextReadiness);
+      return nextReadiness;
+    } catch (requestError) {
+      const message = toErrorMessage(requestError, "Could not run environment checks.");
+      setReadiness({
+        overallStatus: "failed",
+        canStart: false,
+        checkedAt: new Date().toISOString(),
+        repoPath: normalizedPath,
+        items: [
+          {
+            key: "project-folder",
+            status: "failed",
+            message,
+            recommendedAction: "Make sure the local server is running, then try the environment checks again."
+          }
+        ]
+      });
+      return null;
+    } finally {
+      setIsLoadingReadiness(false);
+    }
   };
 
   useEffect(() => {
@@ -293,6 +333,52 @@ export function App() {
         setIsLoadingRecentProjects(false);
       });
   }, [status.active]);
+
+  useEffect(() => {
+    if (!repoPath.trim()) {
+      setReadiness(null);
+      setIsLoadingReadiness(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingReadiness(true);
+
+    void loadReadiness(repoPath.trim())
+      .then((nextReadiness) => {
+        if (!cancelled) {
+          setReadiness(nextReadiness);
+        }
+      })
+      .catch((requestError: unknown) => {
+        if (!cancelled) {
+          const message = toErrorMessage(requestError, "Could not run environment checks.");
+          setReadiness({
+            overallStatus: "failed",
+            canStart: false,
+            checkedAt: new Date().toISOString(),
+            repoPath: repoPath.trim(),
+            items: [
+              {
+                key: "project-folder",
+                status: "failed",
+                message,
+                recommendedAction: "Make sure the local server is running, then try the environment checks again."
+              }
+            ]
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingReadiness(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath]);
 
   useEffect(() => {
     setIsLoadingSessions(true);
@@ -517,10 +603,21 @@ export function App() {
     };
   }, []);
 
-  const startSession = () => {
+  const startSession = async () => {
     if (socketRef.current?.readyState !== WebSocket.OPEN) {
       const detail = "The local server connection is not ready yet.";
       setError(`${detail}\nTechnical details: websocket readyState was not OPEN when start was requested.`);
+      setSessionBanner((current) => reduceSessionBanner(current, { type: "error-received", detail }));
+      return;
+    }
+
+    const currentReadiness = await runReadinessChecks(repoPath);
+    if (!currentReadiness || !currentReadiness.canStart) {
+      const failedChecks = currentReadiness?.items.filter((item) => item.status === "failed") ?? [];
+      const firstFailure = failedChecks[0];
+      const detail = firstFailure?.message || "This project is not ready for a Codex session yet.";
+      const nextStep = firstFailure?.recommendedAction ? `\nNext step: ${firstFailure.recommendedAction}` : "";
+      setError(`${detail}${nextStep}`);
       setSessionBanner((current) => reduceSessionBanner(current, { type: "error-received", detail }));
       return;
     }
@@ -1090,11 +1187,18 @@ export function App() {
               void createProjectFolder();
             },
             isCreatingProject,
-            onStartSession: startSession,
+            onStartSession: () => {
+              void startSession();
+            },
             onStopSession: stopSession,
             connectionStateLabel: formatConnectionState(connectionState),
             defaultRepoRoot: settings.defaultRepoRoot,
             isLoadingSettings,
+            readiness,
+            isLoadingReadiness,
+            onRefreshReadiness: () => {
+              void runReadinessChecks(repoPath);
+            },
             recentProjects,
             isLoadingRecentProjects
           }}
