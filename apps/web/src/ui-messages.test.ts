@@ -26,9 +26,14 @@ describe("friendlyUploadErrorMessage", () => {
     );
     expect(
       friendlyUploadErrorMessage(
-        "That folder does not look like a project yet. Expected one of: .git, package.json, pyproject.toml, Cargo.toml, or README.md."
+        "That folder does not look like a project yet. Start in a folder that already contains project files such as .git, README.md, package.json, pyproject.toml, or Cargo.toml."
       )
-    ).toContain("not a parent folder");
+    ).toContain("Git metadata is helpful but not required");
+    expect(
+      friendlyUploadErrorMessage(
+        "That folder looks like a broad parent directory that contains multiple projects. Open one specific project folder inside it instead."
+      )
+    ).toContain("contains multiple projects");
   });
 
   it("maps oversize pasted context errors to clearer guidance", () => {

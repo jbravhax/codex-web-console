@@ -125,7 +125,7 @@ export function ProjectControls({
         </div>
         <span className="section-chip">{status.active ? "Active" : "Ready"}</span>
       </div>
-      <label htmlFor="repo-path">Repo path</label>
+      <label htmlFor="repo-path">Project folder path</label>
       <div className="repo-input-row">
         <input
           id="repo-path"
@@ -139,8 +139,9 @@ export function ProjectControls({
         </button>
       </div>
       <p className="helper-text">
-        Enter one real project folder here, not a parent directory that contains many different projects.
+        Paste the full path to one real project folder here. Manual path entry is fully supported, and some browsers cannot share a usable absolute folder path from the picker.
       </p>
+      <p className="helper-text">Good examples: `/home/you/my-app` or `/home/you/projects/api-service`. Avoid broad parent folders like `/home/you/Projects`.</p>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
       <div className="control-actions">
         <button type="button" onClick={onStartSession} disabled={status.active || !repoPath.trim()}>

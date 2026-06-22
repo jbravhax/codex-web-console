@@ -46,8 +46,12 @@ export function friendlyUploadErrorMessage(message: string): string {
     return "That path points to a file, not a project folder. Enter a specific project folder instead.";
   }
 
+  if (normalizedMessage.includes("broad parent directory")) {
+    return "That folder looks like a parent directory that contains multiple projects. Open one specific project folder inside it instead of the parent Projects folder.";
+  }
+
   if (normalizedMessage.includes("does not look like a project")) {
-    return "That folder does not look like a project yet. Choose a specific project folder, not a parent folder like /home/you/Projects, or add .git, README.md, package.json, pyproject.toml, or Cargo.toml first.";
+    return "That folder does not look like a project yet. Choose a folder that already contains project files like .git, README.md, package.json, pyproject.toml, or Cargo.toml. Git metadata is helpful but not required if another recognizable project file is present.";
   }
 
   if (normalizedMessage.includes("specific folder inside /home")) {

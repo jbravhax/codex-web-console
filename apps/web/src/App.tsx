@@ -178,7 +178,7 @@ export function App() {
     terminal.open(terminalContainerRef.current!);
     fitAddon.fit();
     terminal.writeln("Codex CLI Web Console");
-    terminal.writeln("Enter a repo path and start a session.");
+    terminal.writeln("Enter one real project folder path and start a session.");
     terminal.writeln("");
 
     terminal.onData((data) => {
@@ -729,10 +729,10 @@ export function App() {
       }
 
       if (result.kind === "cancelled") {
-        setRepoPickerMessage("Folder selection was canceled. Paste the repo path manually or try again.");
+        setRepoPickerMessage("Folder selection was canceled. You can paste the full project folder path manually or try the picker again.");
       }
     } catch {
-      setError("Could not open the folder picker. Paste the repo path manually.");
+      setError("Could not open the folder picker. Paste the full project folder path manually.");
     }
   };
 

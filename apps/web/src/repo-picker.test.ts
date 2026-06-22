@@ -28,7 +28,7 @@ describe("repo directory picker", () => {
       kind: "unsupported",
       message: REPO_PICKER_UNSUPPORTED_MESSAGE
     });
-    expect(REPO_PICKER_UNSUPPORTED_MESSAGE).toContain("project folder path manually");
+    expect(REPO_PICKER_UNSUPPORTED_MESSAGE).toContain("full project folder path manually");
   });
 
   it("returns a cancelled result when the user dismisses the picker", async () => {
@@ -54,7 +54,7 @@ describe("repo directory picker", () => {
       kind: "missing-path",
       message: REPO_PICKER_MISSING_PATH_MESSAGE
     });
-    expect(REPO_PICKER_MISSING_PATH_MESSAGE).toContain("project folder path manually");
+    expect(REPO_PICKER_MISSING_PATH_MESSAGE).toContain("full project folder path manually");
   });
 });
 

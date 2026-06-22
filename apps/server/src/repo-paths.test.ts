@@ -38,6 +38,18 @@ describe("repo path validation", () => {
     expect(() => validateRepoPath(directoryPath)).toThrow("does not look like a project");
   });
 
+  it("rejects broad parent folders that contain multiple projects", () => {
+    const directoryPath = makeTempDir("codex-web-parent-");
+    const appOne = path.join(directoryPath, "app-one");
+    const appTwo = path.join(directoryPath, "app-two");
+    fs.mkdirSync(appOne);
+    fs.mkdirSync(appTwo);
+    fs.writeFileSync(path.join(appOne, "README.md"), "# App One\n", "utf8");
+    fs.writeFileSync(path.join(appTwo, "package.json"), "{}\n", "utf8");
+
+    expect(() => validateRepoPath(directoryPath)).toThrow("broad parent directory");
+  });
+
   it("rejects file paths", () => {
     const repoPath = makeTempDir("codex-web-file-path-");
     const filePath = path.join(repoPath, "README.md");

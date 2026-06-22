@@ -1,8 +1,8 @@
 export const REPO_PICKER_UNSUPPORTED_MESSAGE =
-  "This browser cannot provide a local project-folder path here. Paste the project folder path manually.";
+  "This browser cannot provide a usable local project-folder path here. Paste the full project folder path manually in the field above.";
 
 export const REPO_PICKER_MISSING_PATH_MESSAGE =
-  "The browser let you choose a folder, but it did not expose a usable full path to the app. Paste the project folder path manually.";
+  "The browser let you choose a folder, but it did not expose a usable full path to the app. Paste the full project folder path manually in the field above.";
 
 export type DirectoryPickerHandle = {
   name?: string;

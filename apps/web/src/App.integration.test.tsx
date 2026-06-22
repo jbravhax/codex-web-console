@@ -232,6 +232,7 @@ describe("App integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choose repo" }));
 
     expect(await screen.findByText(REPO_PICKER_UNSUPPORTED_MESSAGE)).toBeTruthy();
+    expect(screen.getByText(/Manual path entry is fully supported/i)).toBeTruthy();
   });
 
   it("walks the session banner through idle, starting, running, stopping, and stopped states", async () => {
@@ -239,7 +240,7 @@ describe("App integration", () => {
 
     expect(await screen.findByText("Idle")).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Repo path"), {
+    fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
         value: "/workspace/default-project"
       }
@@ -353,6 +354,24 @@ describe("App integration", () => {
     const repoPathMessages = await screen.findAllByText(/That project folder does not exist yet/i);
     expect(repoPathMessages.length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText(/Technical details: The path does not exist: \/workspace\/missing-project/i)).toBeTruthy();
+  });
+
+  it("shows clear guidance when the selected folder looks like a broad parent directory", async () => {
+    const socket = renderApp();
+
+    socket.emitMessage({
+      type: "error",
+      payload: {
+        category: "invalid-repo-path",
+        userMessage:
+          "That folder looks like a parent directory that contains multiple projects. Open one specific project folder inside it instead of the parent Projects folder.",
+        technicalDetail:
+          "That folder looks like a broad parent directory that contains multiple projects. Open one specific project folder inside it instead."
+      }
+    });
+
+    expect((await screen.findAllByText(/contains multiple projects/i)).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText(/specific project folder inside it/i)).length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows actionable diagnostics when codex is not installed or exits unexpectedly", async () => {

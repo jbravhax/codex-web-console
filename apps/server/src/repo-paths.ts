@@ -8,6 +8,29 @@ type ValidatePathOptions = {
   requireProjectHint: boolean;
 };
 
+function hasProjectHint(directoryPath: string): boolean {
+  return PROJECT_HINT_FILES.some((entry) => fs.existsSync(path.join(directoryPath, entry)));
+}
+
+function looksLikeBroadParentDirectory(directoryPath: string): boolean {
+  let childEntries: fs.Dirent[];
+
+  try {
+    childEntries = fs.readdirSync(directoryPath, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+
+  const childDirectories = childEntries.filter((entry) => entry.isDirectory());
+  if (childDirectories.length === 0) {
+    return false;
+  }
+
+  const childProjectDirectories = childDirectories.filter((entry) => hasProjectHint(path.join(directoryPath, entry.name)));
+
+  return childProjectDirectories.length > 0 || childDirectories.length >= 3;
+}
+
 function validateSafeDirectoryPath(inputPath: string, options: ValidatePathOptions): string {
   const trimmedPath = inputPath.trim();
   if (!trimmedPath) {
@@ -40,10 +63,16 @@ function validateSafeDirectoryPath(inputPath: string, options: ValidatePathOptio
     throw new Error(`The path is not a directory: ${resolvedPath}`);
   }
 
-  const hasProjectHint = PROJECT_HINT_FILES.some((entry) => fs.existsSync(path.join(resolvedPath, entry)));
-  if (options.requireProjectHint && !hasProjectHint) {
+  const directoryHasProjectHint = hasProjectHint(resolvedPath);
+  if (options.requireProjectHint && !directoryHasProjectHint) {
+    if (looksLikeBroadParentDirectory(resolvedPath)) {
+      throw new Error(
+        "That folder looks like a broad parent directory that contains multiple projects. Open one specific project folder inside it instead."
+      );
+    }
+
     throw new Error(
-      "That folder does not look like a project yet. Expected one of: .git, package.json, pyproject.toml, Cargo.toml, or README.md."
+      "That folder does not look like a project yet. Start in a folder that already contains project files such as .git, README.md, package.json, pyproject.toml, or Cargo.toml."
     );
   }
 
