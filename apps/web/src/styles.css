@@ -449,14 +449,6 @@ textarea {
   color: var(--text);
 }
 
-.attachment-dropzone {
-  margin-bottom: 1rem;
-  padding: 1rem;
-  border: 1px dashed var(--input-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--panel-bg) 85%, transparent);
-}
-
 .attachment-actions {
   display: flex;
   align-items: center;
@@ -1154,7 +1146,6 @@ textarea {
   line-height: 1.6;
 }
 
-.attachment-dropzone,
 .prompt-preview-panel,
 .context-preview,
 .transcript-viewer,
@@ -1164,11 +1155,6 @@ textarea {
 .diff-panel,
 .transcript-panel {
   background: rgba(255, 255, 255, 0.025);
-}
-
-.attachment-dropzone {
-  border-radius: 24px;
-  padding: 1.1rem;
 }
 
 .attachment-chip {

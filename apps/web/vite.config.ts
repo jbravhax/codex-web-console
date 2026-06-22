@@ -8,6 +8,21 @@ const apiPort = Number(process.env.VITE_API_PORT || 8787);
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("@xterm")) {
+            return "xterm-vendor";
+          }
+
+          if (id.includes("react") || id.includes("scheduler")) {
+            return "react-vendor";
+          }
+        }
+      }
+    }
+  },
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts"

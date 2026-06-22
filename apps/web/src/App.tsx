@@ -3,6 +3,12 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { createPastedImageFileName, isSupportedAttachmentName } from "./attachments";
 import type { PendingAttachment } from "./attachment-types";
+import {
+  buildCopyFailureMessage,
+  buildCopySuccessMessage,
+  buildZipUploadSuccessMessage,
+  toErrorMessage
+} from "./app-feedback";
 import type {
   AppSettings,
   DiffViewerState,
@@ -45,7 +51,6 @@ import {
   updateUploadingProgress,
   type PendingContextItem
 } from "./pending-context";
-import { CopyTextError, type CopyTextResult } from "./clipboard";
 import { createInitialSessionBanner, reduceSessionBanner, type SessionBanner } from "./session-banner";
 import { buildSessionWebSocketUrl } from "./session-connection";
 import { copyTranscriptText, loadSessionTranscript } from "./session-transcripts";
@@ -139,40 +144,13 @@ export function App() {
   const diffPanelText = diffViewer.diff ? buildGitDiffPanelText(diffViewer.diff) : "";
   const diffEmptyState = diffViewer.diff ? buildGitDiffEmptyState(diffViewer.diff) : "";
 
-  const setCopyFeedback = (subject: string, result: CopyTextResult) => {
-    if (result.method === "fallback") {
-      setContextMessage(
-        result.clipboardBlocked
-          ? `Copied ${subject} using the browser fallback after direct clipboard access was blocked.`
-          : `Copied ${subject} using the browser fallback.`
-      );
-      setError("");
-      return;
-    }
-
-    setContextMessage(`Copied ${subject}.`);
+  const setCopyFeedback = (subject: string, result: Awaited<ReturnType<typeof copyRelativePath>>) => {
+    setContextMessage(buildCopySuccessMessage(subject, result));
     setError("");
   };
 
   const setClipboardFailure = (subject: string, copyError: unknown) => {
-    if (copyError instanceof CopyTextError) {
-      if (copyError.code === "clipboard-blocked") {
-        setError(`Direct clipboard access was blocked, and this browser does not offer a fallback copy path for ${subject}.`);
-        return;
-      }
-
-      if (copyError.code === "fallback-unavailable") {
-        setError(`Could not copy ${subject} because this browser does not offer a fallback copy path.`);
-        return;
-      }
-
-      if (copyError.code === "copy-failed" && copyError.clipboardBlocked) {
-        setError(`Direct clipboard access was blocked, and the browser fallback copy failed for ${subject}.`);
-        return;
-      }
-    }
-
-    setError(`Could not copy ${subject}.`);
+    setError(buildCopyFailureMessage(subject, copyError));
   };
 
   useEffect(() => {
@@ -248,7 +226,7 @@ export function App() {
         setRepoPath((current) => current || payload.defaultRepoRoot);
       })
       .catch((requestError: unknown) => {
-        const message = requestError instanceof Error ? requestError.message : "Could not load settings.";
+        const message = toErrorMessage(requestError, "Could not load settings.");
         setError(friendlyUploadErrorMessage(message));
       })
       .finally(() => {
@@ -268,7 +246,7 @@ export function App() {
         setRecentProjects(payload.items);
       })
       .catch((requestError: unknown) => {
-        const message = requestError instanceof Error ? requestError.message : "Could not load recent projects.";
+        const message = toErrorMessage(requestError, "Could not load recent projects.");
         setError(message);
       })
       .finally(() => {
@@ -288,7 +266,7 @@ export function App() {
         setSessions(payload.items);
       })
       .catch((requestError: unknown) => {
-        const message = requestError instanceof Error ? requestError.message : "Could not load recent sessions.";
+        const message = toErrorMessage(requestError, "Could not load recent sessions.");
         setError(message);
       })
       .finally(() => {
@@ -320,7 +298,7 @@ export function App() {
       } catch (requestError) {
         if (!cancelled) {
           setGitStatus(null);
-          setError(requestError instanceof Error ? requestError.message : "Could not load Git status.");
+          setError(toErrorMessage(requestError, "Could not load Git status."));
           setIsLoadingGitStatus(false);
         }
       }
@@ -487,7 +465,7 @@ export function App() {
       setRepoPath((current) => current || nextSettings.defaultRepoRoot);
       setSettingsMessage(payload.message || "Settings saved.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not save settings.");
+      setError(toErrorMessage(requestError, "Could not save settings."));
     }
   };
 
@@ -592,13 +570,7 @@ export function App() {
         replaceUploadingItem(current, uploadId, createPendingContextItemFromAttachment(attachment))
       );
       if (attachment.kind === "zip") {
-        const skippedSummary =
-          attachment.skippedFileCount > 0
-            ? ` ${attachment.skippedFileCount.toLocaleString()} file${attachment.skippedFileCount === 1 ? " was" : "s were"} skipped because ${attachment.skippedFileCount === 1 ? "it was" : "they were"} not reviewable here or would have been unsafe to extract.`
-            : "";
-        setContextMessage(
-          `Uploaded ${attachment.fileName} and extracted ${attachment.extractedFileCount.toLocaleString()} reviewable file${attachment.extractedFileCount === 1 ? "" : "s"} into ${attachment.extractedFolderRelativePath}/ for Codex to inspect.${skippedSummary}`
-        );
+        setContextMessage(buildZipUploadSuccessMessage(attachment));
       } else {
         setContextMessage(`Added ${attachment.relativePath} to the next prompt.`);
       }
@@ -628,9 +600,7 @@ export function App() {
       } catch (requestError) {
         setError(
           friendlyUploadErrorMessage(
-            requestError instanceof Error
-              ? `Could not save pasted image. ${requestError.message}`
-              : "Could not save pasted image."
+            `Could not save pasted image. ${toErrorMessage(requestError, "Could not save pasted image.")}`
           )
         );
       }
@@ -659,9 +629,7 @@ export function App() {
     } catch (requestError) {
       setError(
         friendlyUploadErrorMessage(
-          requestError instanceof Error
-            ? `Could not save pasted context. ${requestError.message}`
-            : "Could not save pasted context."
+          `Could not save pasted context. ${toErrorMessage(requestError, "Could not save pasted context.")}`
         )
       );
     }
@@ -683,9 +651,7 @@ export function App() {
     } catch (requestError) {
       setError(
         friendlyUploadErrorMessage(
-          requestError instanceof Error
-            ? `Could not upload attachment. ${requestError.message}`
-            : "Could not upload attachment."
+          `Could not upload attachment. ${toErrorMessage(requestError, "Could not upload attachment.")}`
         )
       );
     } finally {
@@ -710,9 +676,7 @@ export function App() {
     } catch (requestError) {
       setError(
         friendlyUploadErrorMessage(
-          requestError instanceof Error
-            ? `Could not upload dropped files. ${requestError.message}`
-            : "Could not upload dropped files."
+          `Could not upload dropped files. ${toErrorMessage(requestError, "Could not upload dropped files.")}`
         )
       );
     }
@@ -819,7 +783,7 @@ export function App() {
         session,
         transcript: "",
         isLoading: false,
-        error: requestError instanceof Error ? requestError.message : "Could not load transcript."
+        error: toErrorMessage(requestError, "Could not load transcript.")
       });
     }
   };
@@ -859,7 +823,7 @@ export function App() {
       setDiffViewer({
         diff: null,
         isLoading: false,
-        error: requestError instanceof Error ? requestError.message : "Could not load Git diff."
+        error: toErrorMessage(requestError, "Could not load Git diff.")
       });
     }
   };
