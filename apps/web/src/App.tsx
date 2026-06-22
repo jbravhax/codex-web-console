@@ -55,6 +55,7 @@ import { createInitialSessionBanner, reduceSessionBanner, type SessionBanner } f
 import { buildSessionWebSocketUrl } from "./session-connection";
 import { copyTranscriptText, loadSessionTranscript } from "./session-transcripts";
 import { buildSubmittedPromptInput, detectTerminalOutputState } from "./terminal-session";
+import { buildSessionErrorDisplay, buildUnexpectedExitDisplay, isStructuredSessionFailure } from "./session-diagnostics";
 import { friendlyUploadErrorMessage } from "./ui-messages";
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -369,11 +370,16 @@ export function App() {
 
       if (message.type === "exit") {
         setStatus((current) => ({ active: false, repoPath: current.repoPath }));
+        const exitDisplay = buildUnexpectedExitDisplay(message.payload);
+        if (exitDisplay) {
+          setError(`${exitDisplay.detail}\nTechnical details: ${exitDisplay.technicalDetail}`);
+        }
         setSessionBanner((current) =>
           reduceSessionBanner(current, {
             type: "exit-received",
             exitCode: message.payload.exitCode,
-            signal: message.payload.signal
+            signal: message.payload.signal,
+            failedDetail: exitDisplay?.detail
           })
         );
         setPendingContextItems([]);
@@ -385,20 +391,34 @@ export function App() {
       }
 
       if (message.type === "error") {
-        const detail = friendlyUploadErrorMessage(message.payload);
-        setError(detail);
-        setSessionBanner((current) => reduceSessionBanner(current, { type: "error-received", detail }));
+        const sessionDisplay = isStructuredSessionFailure(message.payload)
+          ? buildSessionErrorDisplay(message.payload)
+          : {
+              detail: friendlyUploadErrorMessage(message.payload),
+              technicalDetail: message.payload
+            };
+        setError(
+          sessionDisplay.technicalDetail && sessionDisplay.technicalDetail !== sessionDisplay.detail
+            ? `${sessionDisplay.detail}\nTechnical details: ${sessionDisplay.technicalDetail}`
+            : sessionDisplay.detail
+        );
+        setSessionBanner((current) =>
+          reduceSessionBanner(current, { type: "error-received", detail: sessionDisplay.detail })
+        );
         terminalRef.current?.writeln("");
-        terminalRef.current?.writeln(`[error] ${message.payload}`);
+        terminalRef.current?.writeln(
+          `[error] ${typeof message.payload === "string" ? message.payload : message.payload.technicalDetail}`
+        );
       }
     };
 
     socket.onclose = () => {
       setConnectionState("disconnected");
       setStatus((current) => ({ active: false, repoPath: current.repoPath }));
-      const detail = "Connection to the local Codex server was closed. Restart the server if needed.";
+      const detail =
+        "The live session disconnected from the local Codex server. If the server stopped, restart it. Then open a new session and try again.";
       setSessionBanner((current) => reduceSessionBanner(current, { type: "websocket-close", detail }));
-      setError(detail);
+      setError(`${detail}\nTechnical details: websocket connection closed.`);
     };
 
     socketRef.current = socket;
@@ -411,7 +431,7 @@ export function App() {
   const startSession = () => {
     if (socketRef.current?.readyState !== WebSocket.OPEN) {
       const detail = "The local server connection is not ready yet.";
-      setError(detail);
+      setError(`${detail}\nTechnical details: websocket readyState was not OPEN when start was requested.`);
       setSessionBanner((current) => reduceSessionBanner(current, { type: "error-received", detail }));
       return;
     }

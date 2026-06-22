@@ -2,6 +2,7 @@ import type React from "react";
 import type { PendingContextItem } from "./pending-context-types";
 import type { GitDiffSummary } from "./git-diff-viewer";
 import type { SessionBanner } from "./session-banner";
+import type { SessionExitPayload, SessionFailurePayload } from "./session-diagnostics";
 
 export type ThemeSetting = "light" | "dark";
 
@@ -59,8 +60,8 @@ export type GitStatusSummary = {
 export type ServerMessage =
   | { type: "status"; payload: SessionStatus }
   | { type: "output"; payload: string }
-  | { type: "exit"; payload: { exitCode: number; signal: number } }
-  | { type: "error"; payload: string };
+  | { type: "exit"; payload: SessionExitPayload }
+  | { type: "error"; payload: string | SessionFailurePayload };
 
 export type ProjectControlsProps = {
   status: SessionStatus;

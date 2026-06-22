@@ -1,4 +1,5 @@
 import type { SessionManager } from "./session.js";
+import { classifySessionExit, classifySessionStartupError } from "./session-errors.js";
 
 type SocketReadyState = 1;
 
@@ -49,16 +50,20 @@ export function attachSessionSocket(socket: SessionSocket, ownerId: string, sess
         });
 
         session.ptyProcess.onExit(({ exitCode, signal }) => {
+          const recentOutput = sessionManager.getRecentOutput(ownerId);
+          const resolvedExitCode = exitCode ?? 0;
+          const resolvedSignal = signal ?? 0;
+          const failure = classifySessionExit(resolvedExitCode, resolvedSignal, recentOutput, session.repoPath);
           sessionManager.clear(ownerId);
           if (socket.readyState === (1 as SocketReadyState)) {
-            sendMessage(socket, "exit", { exitCode, signal });
+            sendMessage(socket, "exit", { exitCode: resolvedExitCode, signal: resolvedSignal, failure });
             sendMessage(socket, "status", sessionManager.getStatus(ownerId));
           }
         });
 
         sendMessage(socket, "status", sessionManager.getStatus(ownerId));
       } catch (error) {
-        sendMessage(socket, "error", error instanceof Error ? error.message : "Failed to start session.");
+        sendMessage(socket, "error", classifySessionStartupError(error));
       }
 
       return;

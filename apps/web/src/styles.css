@@ -1241,6 +1241,8 @@ textarea {
   margin-top: 1rem;
   padding: 0.9rem 1rem;
   color: var(--error);
+  white-space: pre-wrap;
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {

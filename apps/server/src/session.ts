@@ -35,6 +35,7 @@ type ActiveSession = {
   startedAt: string;
   transcriptPath: string;
   metadataPath: string;
+  recentOutput: string;
   isFinalized: boolean;
 };
 
@@ -131,6 +132,7 @@ export class SessionManager {
       startedAt,
       transcriptPath,
       metadataPath,
+      recentOutput: "",
       isFinalized: false
     };
 
@@ -185,7 +187,12 @@ export class SessionManager {
       return;
     }
 
+    session.recentOutput = `${session.recentOutput}${cleanedOutput}`.slice(-800);
     fs.appendFileSync(session.transcriptPath, cleanedOutput, "utf8");
+  }
+
+  getRecentOutput(ownerId: string): string {
+    return this.sessions.get(ownerId)?.recentOutput ?? "";
   }
 
   clear(ownerId: string): void {

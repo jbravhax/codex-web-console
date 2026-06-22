@@ -28,7 +28,7 @@ type SessionBannerEvent =
   | { type: "completion-detected"; repoPath: string | null }
   | { type: "activity-detected"; repoPath: string | null }
   | { type: "stop-requested" }
-  | { type: "exit-received"; exitCode: number; signal: number }
+  | { type: "exit-received"; exitCode: number; signal: number; failedDetail?: string }
   | { type: "websocket-close"; detail: string }
   | { type: "error-received"; detail: string };
 
@@ -146,6 +146,14 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
   }
 
   if (event.type === "exit-received") {
+    if (event.failedDetail) {
+      return {
+        state: "failed",
+        title: "Session failed",
+        detail: event.failedDetail
+      };
+    }
+
     if (previous.state === "stopping") {
       return {
         state: "stopped",

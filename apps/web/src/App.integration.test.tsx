@@ -342,11 +342,52 @@ describe("App integration", () => {
 
     socket.emitMessage({
       type: "error",
-      payload: "The path does not exist: /workspace/missing-project"
+      payload: {
+        category: "repo-path-does-not-exist",
+        userMessage:
+          "That project folder does not exist yet. Create it first, then start Codex in that specific folder.",
+        technicalDetail: "The path does not exist: /workspace/missing-project"
+      }
     });
 
     const repoPathMessages = await screen.findAllByText(/That project folder does not exist yet/i);
     expect(repoPathMessages.length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText(/Technical details: The path does not exist: \/workspace\/missing-project/i)).toBeTruthy();
+  });
+
+  it("shows actionable diagnostics when codex is not installed or exits unexpectedly", async () => {
+    const socket = renderApp();
+
+    socket.emitMessage({
+      type: "error",
+      payload: {
+        category: "codex-not-found",
+        userMessage:
+          "Codex could not be started because the configured executable was not found. Check the Codex executable path in Settings and make sure Codex is installed on this machine.",
+        technicalDetail: "spawn codex ENOENT"
+      }
+    });
+
+    expect((await screen.findAllByText(/configured executable was not found/i)).length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText(/Technical details: spawn codex ENOENT/i)).toBeTruthy();
+
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    socket.emitMessage({
+      type: "exit",
+      payload: {
+        exitCode: 1,
+        signal: 0,
+        failure: {
+          category: "sandbox-unavailable",
+          userMessage:
+            "Codex could not finish starting its Linux sandbox for /workspace/default-project. Make sure bubblewrap is installed and that this Linux host allows the required user namespace setup.",
+          technicalDetail: "bubblewrap needs access to create user namespaces"
+        }
+      }
+    });
+
+    expect(await screen.findByText("Session failed")).toBeTruthy();
+    expect((await screen.findAllByText(/could not finish starting its linux sandbox/i)).length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows an empty preview state when nothing is queued", async () => {

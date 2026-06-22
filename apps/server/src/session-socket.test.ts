@@ -67,6 +67,7 @@ describe("attachSessionSocket", () => {
         .mockReturnValueOnce({ active: false, repoPath: null })
         .mockReturnValueOnce({ active: true, repoPath: "/workspace/project" }),
       start: vi.fn().mockReturnValue({ ptyProcess: fakePty }),
+      getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),
       clear: vi.fn(),
       write: vi.fn(),
@@ -92,6 +93,7 @@ describe("attachSessionSocket", () => {
         .mockReturnValueOnce({ active: true, repoPath: "/workspace/project" })
         .mockReturnValueOnce({ active: false, repoPath: null }),
       start: vi.fn().mockReturnValue({ ptyProcess: fakePty }),
+      getRecentOutput: vi.fn().mockReturnValue("codex output"),
       appendOutput: vi.fn(),
       clear: vi.fn(),
       write: vi.fn(),
@@ -107,7 +109,7 @@ describe("attachSessionSocket", () => {
     expect(sessionManager.appendOutput).toHaveBeenCalledWith("owner-2", "codex output");
     expect(socket.sent).toContainEqual({ type: "output", payload: "codex output" });
     expect(sessionManager.clear).toHaveBeenCalledWith("owner-2");
-    expect(socket.sent).toContainEqual({ type: "exit", payload: { exitCode: 0, signal: 15 } });
+    expect(socket.sent).toContainEqual({ type: "exit", payload: { exitCode: 0, signal: 15, failure: null } });
     expect(socket.sent).toContainEqual({ type: "status", payload: { active: false, repoPath: null } });
   });
 
@@ -116,6 +118,7 @@ describe("attachSessionSocket", () => {
     const sessionManager = {
       getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null }),
       start: vi.fn(),
+      getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),
       clear: vi.fn(),
       write: vi.fn(),
@@ -139,6 +142,7 @@ describe("attachSessionSocket", () => {
     const sessionManager = {
       getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null }),
       start: vi.fn(),
+      getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),
       clear: vi.fn(),
       write: vi.fn(),
@@ -152,5 +156,33 @@ describe("attachSessionSocket", () => {
 
     expect(socket.sent).toContainEqual({ type: "error", payload: "Invalid message." });
     expect(socket.sent).toContainEqual({ type: "error", payload: "Malformed message." });
+  });
+
+  it("sends structured startup failures for known start errors", () => {
+    const socket = new FakeSocket();
+    const sessionManager = {
+      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null }),
+      start: vi.fn().mockImplementation(() => {
+        const error = new Error("spawn codex ENOENT") as Error & { code: string };
+        error.code = "ENOENT";
+        throw error;
+      }),
+      getRecentOutput: vi.fn().mockReturnValue(""),
+      appendOutput: vi.fn(),
+      clear: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      stop: vi.fn()
+    };
+
+    attachSessionSocket(socket, "owner-5", sessionManager as never);
+    socket.emitMessage({ type: "start", repoPath: "/workspace/project" });
+
+    expect(socket.sent).toContainEqual({
+      type: "error",
+      payload: expect.objectContaining({
+        category: "codex-not-found"
+      })
+    });
   });
 });
