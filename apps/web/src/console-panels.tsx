@@ -628,24 +628,27 @@ export function PendingContextPanel({
   pendingContextPreviewLines,
   onClearAll,
   onCopyRelativePath,
-  onRemoveAttachment
-}: PendingContextPanelProps) {
+  onRemoveAttachment,
+  compact = false
+}: PendingContextPanelProps & { compact?: boolean }) {
   const groupedItems = groupPendingContextItems(pendingContextItems);
 
   return (
-    <section className="context-card utility-surface">
-      <div className="section-heading">
-        <div>
-          <p className="section-kicker">Context</p>
-          <h2>Ready context</h2>
-        </div>
+    <section className={`context-card utility-surface ${compact ? "utility-surface-compact" : ""}`.trim()}>
+      <div className={`section-heading ${compact ? "utility-section-heading compact-mode" : ""}`.trim()}>
+        {!compact ? (
+          <div>
+            <p className="section-kicker">Context</p>
+            <h2>Ready context</h2>
+          </div>
+        ) : <span />}
         <button type="button" className="ghost" onClick={onClearAll} disabled={pendingContextItems.length === 0}>
           Clear all
         </button>
       </div>
       <p className="pending-context-subtitle">
         {readyPendingItemCount > 0
-          ? `${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"} will be included with the next prompt.`
+          ? `${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"} ready for the next prompt.`
           : pendingContextItems.length > 0
             ? "Context is still being prepared."
             : pendingContextEmptyState}
@@ -750,7 +753,7 @@ export function PendingContextPanel({
       )}
       {pendingContextPreviewLines.length > 0 ? (
         <div className="context-preview">
-          <strong>Pending context summary</strong>
+          <strong>{compact ? "Included next" : "Pending context summary"}</strong>
           <ul className="context-preview-list">
             {pendingContextPreviewLines.map((line) => (
               <li key={line}>{line}</li>
@@ -793,7 +796,6 @@ export function ComposerPanel({
         <div>
           <p className="section-kicker">Prompt</p>
           <h2>Guide Codex intentionally</h2>
-          <p className="helper-text">Describe the task, then send it.</p>
         </div>
         <div className="attachment-actions">
           <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={!status.active}>
@@ -832,7 +834,6 @@ export function ComposerPanel({
         <div className="prompt-preview-header">
           <div>
             <strong>What Codex will receive</strong>
-            {!isPromptPreviewExpanded ? <p className="helper-text">Review only when needed.</p> : null}
           </div>
           <div className="prompt-preview-actions">
             <button type="button" className="ghost" onClick={onTogglePromptPreview}>
@@ -892,17 +893,15 @@ export function RepoInsightsPanel({
   diffPanelText,
   diffEmptyState,
   onViewDiff,
-  onCopyDiff
-}: RepoInsightsPanelProps) {
+  onCopyDiff,
+  compact = false
+}: RepoInsightsPanelProps & { compact?: boolean }) {
   const hasDiffState = diffViewer.isLoading || Boolean(diffViewer.error) || Boolean(diffViewer.diff) || Boolean(diffEmptyState);
 
   return (
-    <section className="git-section utility-surface">
-      <div className="section-heading utility-section-heading">
-        <div>
-          <h2>Changes</h2>
-        </div>
-        {status.active ? <span className="section-chip">Live</span> : null}
+    <section className={`git-section utility-surface ${compact ? "utility-surface-compact" : ""}`.trim()}>
+      <div className={`section-heading utility-section-heading ${compact ? "compact-mode" : ""}`.trim()}>
+        {!compact ? <div><h2>Changes</h2></div> : <span />}
       </div>
       {status.active ? (
         <div className="git-actions">
@@ -986,15 +985,14 @@ export function SessionHistoryPanel({
   onDownloadTranscriptText,
   onDownloadTranscriptMarkdown,
   onDownloadRawTranscript,
-  formatDuration
-}: SessionHistoryPanelProps) {
+  formatDuration,
+  compact = false
+}: SessionHistoryPanelProps & { compact?: boolean }) {
   return (
-    <section className="history-section utility-surface">
-      <div className="section-heading utility-section-heading">
-        <div>
-          <h2>Session history</h2>
-        </div>
-        <span className="section-chip">{sessions.length}</span>
+    <section className={`history-section utility-surface ${compact ? "utility-surface-compact" : ""}`.trim()}>
+      <div className={`section-heading utility-section-heading ${compact ? "compact-mode" : ""}`.trim()}>
+        {!compact ? <div><h2>Session history</h2></div> : <span />}
+        {!compact ? <span className="section-chip">{sessions.length}</span> : null}
       </div>
       <div className="history-list">
         {isLoadingSessions ? <p className="history-empty">Loading recent sessions...</p> : null}
@@ -1161,14 +1159,6 @@ function ResultsSummaryCard({
           <strong>{changesAvailable ? "Available to inspect" : "No changes detected yet"}</strong>
         </article>
       </div>
-      <div className="results-summary-status-list">
-        <span className={`summary-pill ${transcriptAvailable ? "ready" : "muted"}`}>
-          {transcriptAvailable ? "Transcript available" : "Transcript not ready yet"}
-        </span>
-        <span className={`summary-pill ${changesAvailable ? "ready" : "muted"}`}>
-          {changesAvailable ? "Changes available" : "No changes available"}
-        </span>
-      </div>
       <div className="results-summary-actions">
         <button type="button" onClick={onOpenTranscript} disabled={!transcriptAvailable}>
           {primaryActionLabel}
@@ -1213,14 +1203,20 @@ function UtilityPanel({
 
   return (
     <section className="utility-panel rail-card">
+      <div className="utility-panel-header">
+        <div>
+          <p className="section-kicker">Review</p>
+          <h2>{formatUtilityModeLabel(utilityMode)}</h2>
+        </div>
+      </div>
       <div className="utility-mode-tabs" role="tablist" aria-label="Utility panels">
         {utilityTabButtons}
       </div>
       <div className="utility-panel-body">
-        {utilityMode === "context" ? <PendingContextPanel {...pendingContextPanel} /> : null}
-        {utilityMode === "changes" ? <RepoInsightsPanel {...repoInsightsPanel} /> : null}
-        {utilityMode === "history" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer={false} /> : null}
-        {utilityMode === "transcript" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer /> : null}
+        {utilityMode === "context" ? <PendingContextPanel {...pendingContextPanel} compact /> : null}
+        {utilityMode === "changes" ? <RepoInsightsPanel {...repoInsightsPanel} compact /> : null}
+        {utilityMode === "history" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer={false} compact /> : null}
+        {utilityMode === "transcript" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer compact /> : null}
       </div>
     </section>
   );
@@ -1297,7 +1293,7 @@ export function ConsoleView({
         <WorkflowStepper workflowPhase={workflowPhase} />
         <ComposerPanel {...composerPanel} />
 
-        <section className="terminal-section workspace-card">
+        <section className={`terminal-section workspace-card ${status.active ? "terminal-section-live" : ""}`.trim()}>
           <div
             className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
               sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""

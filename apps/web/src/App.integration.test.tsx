@@ -933,7 +933,9 @@ describe("App integration", () => {
     });
 
     fireEvent.click(screen.getByRole("tab", { name: "Context" }));
-    expect(await screen.findByText("Ready context")).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Context" }).getAttribute("aria-selected")).toBe("true");
+    });
 
     socket.emitMessage({
       type: "output",
@@ -941,7 +943,6 @@ describe("App integration", () => {
     });
 
     expect((await screen.findAllByText("Results")).length).toBeGreaterThanOrEqual(1);
-    expect(await screen.findByText("Transcript available")).toBeTruthy();
     expect(await screen.findByText("Review transcript")).toBeTruthy();
   });
 });
