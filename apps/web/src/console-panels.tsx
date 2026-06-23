@@ -1416,7 +1416,7 @@ function ApprovalActionStrip({
           const promptInput = document.getElementById("prompt-input");
           if (promptInput instanceof HTMLTextAreaElement) {
             promptInput.focus();
-            promptInput.scrollIntoView({ block: "center", behavior: "smooth" });
+            promptInput.scrollIntoView?.({ block: "center", behavior: "smooth" });
           }
         }}
       >
@@ -1453,21 +1453,20 @@ export function ConsoleView({
   const projectSubtitle = buildProjectSubtitle(projectControls.repoPath, projectControls.defaultRepoRoot);
   const terminalGuidance = buildTerminalGuidance(sessionBanner);
   const hasResults = isResultsWorkspaceState(workspaceState) || Boolean(latestSession);
-  const showResultsSummary = surface === "workspace" && workspaceSection === "results";
+  const showResultsSummary = surface === "workspace" && hasResults;
   const showTerminalGuidance =
     sessionBanner.state === "awaiting-approval" ||
     sessionBanner.state === "awaiting-input" ||
     sessionBanner.state === "disconnected" ||
     sessionBanner.state === "failed";
   const showProjectWorkspace = surface === "project";
-  const showComposeWorkspace = surface === "workspace" && workspaceSection === "compose";
-  const showLiveRunWorkspace = surface === "workspace" && workspaceSection === "live-run";
+  const showWorkspace = surface === "workspace";
 
   return (
     <div
-      className={`console-layout workflow-${visualWorkspaceView} workspace-view-${showProjectWorkspace ? "project" : workspaceSection} ${
-        inspectorOpen ? "inspector-open" : "inspector-closed"
-      }`.trim()}
+      className={`console-layout surface-${surface} workflow-${visualWorkspaceView} workspace-state-${workspaceState} workspace-view-${
+        showProjectWorkspace ? "project" : visualWorkspaceView
+      } workspace-focus-${showProjectWorkspace ? "project" : workspaceSection} ${inspectorOpen ? "inspector-open" : "inspector-closed"}`.trim()}
     >
       <aside className="control-rail">
         <ProjectRail
@@ -1501,13 +1500,13 @@ export function ConsoleView({
 
         {showProjectWorkspace ? <ProjectControls {...projectControls} /> : null}
 
-        {showComposeWorkspace ? <ComposerPanel {...composerPanel} /> : null}
+        {showWorkspace ? <ComposerPanel {...composerPanel} /> : null}
 
         <section
           className={`terminal-section workspace-card ${status.active ? "terminal-section-live" : ""} ${
-            showLiveRunWorkspace ? "" : "workspace-pane-hidden"
+            showWorkspace ? "" : "workspace-pane-hidden"
           }`.trim()}
-          aria-hidden={!showLiveRunWorkspace}
+          aria-hidden={!showWorkspace}
         >
           <div
             className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
@@ -1523,8 +1522,12 @@ export function ConsoleView({
                   {status.active
                     ? sessionBanner.state === "awaiting-approval"
                       ? "Codex paused for approval."
-                      : "Codex is running your task."
-                    : "Start a session to open the terminal workspace."}
+                      : sessionBanner.state === "awaiting-input"
+                        ? "Codex is waiting for your next instruction."
+                        : isResultsWorkspaceState(workspaceState)
+                          ? "Session output remains here while you review what happened."
+                          : "Codex is running your task."
+                    : "The terminal stays here while you compose, run, and review work in one place."}
                 </p>
               </div>
               <div className="terminal-stage-meta">
@@ -1537,7 +1540,7 @@ export function ConsoleView({
                     className="ghost terminal-tool-button"
                     onClick={() => {
                       const terminal = terminalContainerRef.current;
-                      terminal?.scrollIntoView({ block: "center", behavior: "smooth" });
+                      terminal?.scrollIntoView?.({ block: "center", behavior: "smooth" });
                     }}
                   >
                     Focus
@@ -1550,12 +1553,7 @@ export function ConsoleView({
           </div>
         </section>
 
-        {showLiveRunWorkspace ? <ApprovalActionStrip sessionBanner={sessionBanner} /> : null}
-        {showLiveRunWorkspace ? (
-          <section className="workspace-followup">
-            <ComposerPanel {...composerPanel} />
-          </section>
-        ) : null}
+        {showWorkspace ? <ApprovalActionStrip sessionBanner={sessionBanner} /> : null}
 
         {showResultsSummary ? (
           <ResultsSummaryCard
@@ -1570,7 +1568,7 @@ export function ConsoleView({
               const promptInput = document.getElementById("prompt-input");
               if (promptInput instanceof HTMLTextAreaElement) {
                 promptInput.focus();
-                promptInput.scrollIntoView({ block: "center", behavior: "smooth" });
+                promptInput.scrollIntoView?.({ block: "center", behavior: "smooth" });
               }
             }}
             formatDuration={sessionHistoryPanel.formatDuration}
