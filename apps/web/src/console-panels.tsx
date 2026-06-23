@@ -461,7 +461,7 @@ function ProjectRail({
     {
       view: "workspace",
       label: "Workspace",
-      detail: hasActiveSession ? "Compose, run, and review in one place" : "Open the unified working canvas",
+      detail: hasActiveSession ? "Work with Codex in one place" : "Open the main workspace",
       badge: readyPendingItemCount > 0 ? `${readyPendingItemCount}` : null,
       disabled: !hasProjectPath
     }
@@ -584,7 +584,7 @@ export function ProjectControls({
         <span className="section-chip">{status.active ? "Session active" : "Setup"}</span>
       </div>
       <p className="helper-text project-workspace-summary">
-        Open one real project folder, then start Codex when the workspace looks ready.
+        Open one real project folder, then start Codex.
       </p>
       <label htmlFor="repo-path">Project folder path</label>
       <div className="repo-input-row">
@@ -600,7 +600,7 @@ export function ProjectControls({
         </button>
       </div>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
-      <p className="helper-text project-path-guidance">Use one real project folder. Manual path entry stays fully supported.</p>
+      <p className="helper-text project-path-guidance">Use one real project folder. You can always paste the path.</p>
       <div className="project-launch-actions">
         <button
           type="button"
@@ -671,7 +671,7 @@ export function ProjectControls({
         <div className="readiness-card">
           <div className="readiness-card-header">
             <div>
-              <strong>Session preflight</strong>
+              <strong>Before you start</strong>
               <p className="helper-text collapsible-section-subtitle">
                 {isLoadingSettings ? "Loading default project root..." : defaultRepoRoot || "Choose a folder"}
               </p>
@@ -877,7 +877,7 @@ export function PendingContextPanel({
             : pendingContextEmptyState}
       </p>
       {pendingContextItems.length === 0 ? (
-        <p className="empty-context">Add context only when this task needs it.</p>
+        <p className="empty-context">No context yet.</p>
       ) : (
         <div className="attachment-groups">
           {groupedItems.map((group) => (
@@ -1505,7 +1505,7 @@ export function ConsoleView({
   const projectSubtitle = buildProjectSubtitle(projectControls.repoPath, projectControls.defaultRepoRoot);
   const terminalGuidance = buildTerminalGuidance(sessionBanner);
   const hasResults = isResultsWorkspaceState(workspaceState) || Boolean(latestSession);
-  const showResultsSummary = surface === "workspace" && hasResults;
+  const showResultsSummary = surface === "workspace" && isResultsWorkspaceState(workspaceState);
   const showTerminalGuidance =
     sessionBanner.state === "awaiting-approval" ||
     sessionBanner.state === "awaiting-input" ||
