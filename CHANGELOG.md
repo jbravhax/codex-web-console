@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [0.6.0] - 2026-06-22
+
+### Changed
+
+- Reworked the product around a clearer `Project` to `Workspace` model so project setup and active Codex work feel like distinct parts of one calmer flow.
+- Unified prompt composition, terminal output, approvals, and results into a single work surface instead of separate compose, live-run, and results pages.
+- Simplified navigation and reduced the dashboard feel so the workspace remains the primary destination while review tools stay accessible.
+- Added dedicated review destinations for `Context`, `History`, `Transcript`, and `Changes` to make supporting information easier to reach without crowding the main work area.
+- Improved product hierarchy, status clarity, and workspace flow so the app feels closer to a focused Codex client and less like a panel-heavy operator console.
+
+### Known limitations
+
+- `multer` 1.x remains an isolated and documented dependency debt in the local upload path.
+- Browser folder picker limitations still depend on browser security and may not expose a usable absolute path.
+- Live session reattach or resume is not supported yet after refresh or disconnect.
+- Linux sandbox behavior still depends on host `bubblewrap` and user namespace support.
+
 ## [0.4.0] - 2026-06-22
 
 ### Added
