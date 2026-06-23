@@ -1258,6 +1258,11 @@ export function App() {
         sessionActivity={sessionActivity}
         connectionStateLabel={formatConnectionState(connectionState)}
         hasActiveSession={status.active}
+        canStartSession={Boolean(repoPath.trim())}
+        onStartSession={() => {
+          void startSession();
+        }}
+        onStopSession={stopSession}
       />
 
       {activeView === "console" ? (
@@ -1301,12 +1306,11 @@ export function App() {
             },
             onRemoveAttachment: removeAttachment
           }}
-          composerPanel={{
-            status,
-            sessionBanner,
-            promptText,
-            onPromptTextChange: setPromptText,
-            onPromptPaste: handlePromptPaste,
+            composerPanel={{
+              status,
+              promptText,
+              onPromptTextChange: setPromptText,
+              onPromptPaste: handlePromptPaste,
             onDrop: handleDrop,
             onFileSelection: handleFileSelection,
             fileInputRef,

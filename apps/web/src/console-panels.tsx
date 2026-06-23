@@ -118,39 +118,14 @@ function buildSessionMomentRows(
   return rows;
 }
 
-function formatUtilityModeLabel(mode: "context" | "history" | "transcript" | "changes"): string {
+function formatUtilityModeLabel(mode: "context" | "transcript" | "changes"): string {
   switch (mode) {
     case "context":
       return "Context";
-    case "history":
-      return "History";
     case "transcript":
       return "Transcript";
     case "changes":
       return "Changes";
-  }
-}
-
-function formatWorkspaceStateLabel(workspaceState: ConsoleViewProps["workspaceState"]): string {
-  switch (workspaceState) {
-    case "idle":
-      return "Idle";
-    case "ready-to-compose":
-      return "Compose";
-    case "running":
-      return "Running";
-    case "awaiting-approval":
-      return "Waiting";
-    case "awaiting-input":
-      return "Waiting";
-    case "completed":
-      return "Completed";
-    case "stopped":
-      return "Stopped";
-    case "failed":
-      return "Needs attention";
-    case "disconnected":
-      return "Disconnected";
   }
 }
 
@@ -177,23 +152,19 @@ function formatWorkspaceStateDetail(workspaceState: ConsoleViewProps["workspaceS
   }
 }
 
-function isReviewPage(page: ConsolePage): page is "context" | "history" | "transcript" | "changes" {
-  return page === "context" || page === "history" || page === "transcript" || page === "changes";
+function buildReviewPageSummary(page: "context" | "transcript" | "changes"): string {
+  switch (page) {
+    case "context":
+      return "Review the files, pasted material, and ZIP context queued for Codex.";
+    case "transcript":
+      return "Review prior sessions and open transcripts from one place.";
+    case "changes":
+      return "Inspect project edits and diffs created during a Codex session.";
+  }
 }
 
-function getSuggestedNextAction(sessionBanner: SessionBanner): string {
-  switch (sessionBanner.state) {
-    case "completed":
-      return "Review the transcript or inspect repo changes, then send the next prompt when you are ready.";
-    case "failed":
-      return "Review the failure details and transcript, then start a fresh session once the issue is fixed.";
-    case "disconnected":
-      return "Reconnect to the local server and start a fresh session because live reattach is not available yet.";
-    case "stopped":
-      return "Review what happened in the transcript, then start a new session when you want to continue.";
-    default:
-      return "Review the session output, then choose the next action from the utility panel.";
-  }
+function isReviewPage(page: ConsolePage): page is "context" | "transcript" | "changes" {
+  return page === "context" || page === "transcript" || page === "changes";
 }
 
 function formatElapsedDuration(startedAt: string | null, endedAt: string | null): string | null {
@@ -285,7 +256,10 @@ export function ConsoleHeader({
   sessionBanner,
   sessionActivity,
   connectionStateLabel,
-  hasActiveSession
+  hasActiveSession,
+  canStartSession,
+  onStartSession,
+  onStopSession
 }: ConsoleHeaderProps) {
   const sessionMoments = buildSessionMomentRows(sessionBanner, sessionActivity);
   const isExceptionalBannerState =
@@ -306,6 +280,7 @@ export function ConsoleHeader({
   const showRoutineBanner = isExceptionalBannerState || sessionBanner.state === "completed" || sessionBanner.state === "stopped";
   const serverLabel = connectionStateLabel === "Connected" ? "Local app online" : connectionStateLabel;
   const sessionLabel = sessionBanner.state === "idle" ? "No session running" : sessionBanner.title;
+  const showInlineSessionActions = sessionBanner.state === "stopped" || sessionBanner.state === "completed";
 
   return (
     <>
@@ -367,7 +342,7 @@ export function ConsoleHeader({
         >
           <div className="session-banner-copy">
             <strong>{sessionBanner.title}</strong>
-            <p>{sessionBanner.detail}</p>
+            {showInlineSessionActions ? null : <p>{sessionBanner.detail}</p>}
             {sessionMoments.length > 0 ? (
               <div className="session-banner-metadata">
                 {sessionMoments.map((row) => (
@@ -376,6 +351,16 @@ export function ConsoleHeader({
                     <strong>{row.value}</strong>
                   </span>
                 ))}
+              </div>
+            ) : null}
+            {showInlineSessionActions ? (
+              <div className="session-banner-inline-actions">
+                <button type="button" className="secondary" onClick={onStartSession} disabled={!canStartSession || hasActiveSession}>
+                  Start session
+                </button>
+                <button type="button" className="ghost" onClick={onStopSession} disabled={!hasActiveSession}>
+                  Stop session
+                </button>
               </div>
             ) : null}
           </div>
@@ -388,7 +373,6 @@ export function ConsoleHeader({
 
 function ProjectRail({
   page,
-  workspaceState,
   onSelectPage,
   projectTitle,
   projectSubtitle,
@@ -397,12 +381,10 @@ function ProjectRail({
   recentProjectCount,
   readyPendingItemCount,
   hasActiveSession,
-  connectionStateLabel,
   onStartSession,
   onStopSession
 }: {
   page: ConsoleViewProps["page"];
-  workspaceState: ConsoleViewProps["workspaceState"];
   onSelectPage(nextPage: ConsolePage): void;
   projectTitle: string;
   projectSubtitle: string;
@@ -411,7 +393,6 @@ function ProjectRail({
   recentProjectCount: number;
   readyPendingItemCount: number;
   hasActiveSession: boolean;
-  connectionStateLabel: string;
   onStartSession(): void;
   onStopSession(): void;
 }) {
@@ -423,8 +404,7 @@ function ProjectRail({
     { view: "workspace", label: "Workspace" },
     { view: "project", label: "Project" },
     { view: "context", label: "Context", badge: readyPendingItemCount > 0 ? `${readyPendingItemCount}` : null },
-    { view: "history", label: "History", badge: recentProjectCount > 0 ? `${recentProjectCount}` : null },
-    { view: "transcript", label: "Transcript" },
+    { view: "transcript", label: "Transcript", badge: recentProjectCount > 0 ? `${recentProjectCount}` : null },
     { view: "changes", label: "Changes" }
   ];
   const readinessLabel =
@@ -434,8 +414,6 @@ function ProjectRail({
         ? "Warning"
         : "Passed";
   const readinessInteractive = Boolean(readiness && readiness.overallStatus !== "passed");
-  const workspaceStatus = formatWorkspaceStateLabel(workspaceState);
-
   return (
     <section className="project-rail rail-card">
       <div className="project-rail-header">
@@ -459,14 +437,6 @@ function ProjectRail({
           </button>
         ))}
       </nav>
-
-      <div className="workspace-status-card slim-status-card" aria-label="Workspace status">
-        <div className="workspace-status-header">
-          <strong>{workspaceStatus}</strong>
-          <span className="project-rail-connection">{connectionStateLabel}</span>
-        </div>
-        <p>{formatWorkspaceStateDetail(workspaceState)}</p>
-      </div>
 
       <div className="project-rail-status">
         {readinessInteractive ? (
@@ -743,12 +713,12 @@ function InspectorLauncher({
   utilityMode,
   onOpenInspector
 }: {
-  utilityMode: "context" | "history" | "transcript" | "changes";
-  onOpenInspector(nextMode: "context" | "history" | "transcript" | "changes"): void;
+  utilityMode: "context" | "transcript" | "changes";
+  onOpenInspector(nextMode: "context" | "transcript" | "changes"): void;
 }) {
   return (
     <div className="inspector-launcher" aria-label="Review tools">
-      {(["context", "history", "transcript", "changes"] as const).map((mode) => (
+      {(["context", "transcript", "changes"] as const).map((mode) => (
         <button
           key={mode}
           type="button"
@@ -774,27 +744,26 @@ export function PendingContextPanel({
   compact = false
 }: PendingContextPanelProps & { compact?: boolean }) {
   const groupedItems = groupPendingContextItems(pendingContextItems);
+  const emptyStateMessage =
+    pendingContextItems.length > 0
+      ? readyPendingItemCount > 0
+        ? `${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"} ready for the next prompt.`
+        : "Context is still being prepared."
+      : pendingContextEmptyState;
 
   return (
     <section className={`context-card utility-surface ${compact ? "utility-surface-compact" : ""}`.trim()}>
       <div className={`section-heading ${compact ? "utility-section-heading compact-mode" : ""}`.trim()}>
         {!compact ? (
           <div>
-            <p className="section-kicker">Context</p>
-            <h2>Ready context</h2>
+            <h2>Prompt context</h2>
           </div>
         ) : <span />}
         <button type="button" className="ghost" onClick={onClearAll} disabled={pendingContextItems.length === 0}>
           Clear all
         </button>
       </div>
-      <p className="pending-context-subtitle">
-        {readyPendingItemCount > 0
-          ? `${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"} ready for the next prompt.`
-          : pendingContextItems.length > 0
-            ? "Context is still being prepared."
-            : pendingContextEmptyState}
-      </p>
+      <p className="pending-context-subtitle">{emptyStateMessage}</p>
       {pendingContextItems.length === 0 ? (
         <p className="empty-context">No context yet.</p>
       ) : (
@@ -909,7 +878,6 @@ export function PendingContextPanel({
 
 export function ComposerPanel({
   status,
-  sessionBanner,
   promptText,
   onPromptTextChange,
   onPromptPaste,
@@ -935,10 +903,12 @@ export function ComposerPanel({
     >
       <div className="composer-header">
         <div>
-          <p className="section-kicker">Prompt</p>
           <h2>Guide Codex intentionally</h2>
         </div>
         <div className="attachment-actions">
+          <button type="button" onClick={onSendPrompt} disabled={!status.active}>
+            Send prompt
+          </button>
           <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={!status.active}>
             Attach files
           </button>
@@ -966,6 +936,12 @@ export function ComposerPanel({
         onChange={(event) => onPromptTextChange(event.target.value)}
         onPaste={(event) => {
           void onPromptPaste(event);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            event.preventDefault();
+            onSendPrompt();
+          }
         }}
         placeholder="Describe the task clearly. Large pasted text will be stored as a local markdown document instead of flooding the prompt."
         disabled={!status.active}
@@ -1015,12 +991,6 @@ export function ComposerPanel({
           </div>
         ) : null}
       </div>
-      <div className="prompt-actions">
-        <button type="button" onClick={onSendPrompt} disabled={!status.active}>
-          Send prompt
-        </button>
-        <span className="helper-text subtle-helper">Large pasted text becomes a saved context file.</span>
-      </div>
     </section>
   );
 }
@@ -1041,7 +1011,7 @@ export function RepoInsightsPanel({
   return (
     <section className={`git-section utility-surface ${compact ? "utility-surface-compact" : ""}`.trim()}>
       <div className={`section-heading utility-section-heading ${compact ? "compact-mode" : ""}`.trim()}>
-        {!compact ? <div><h2>Changes</h2></div> : <span />}
+        {!compact ? <div><h2>Project changes</h2></div> : <span />}
       </div>
       {status.active ? (
         <div className="git-actions">
@@ -1128,30 +1098,40 @@ export function SessionHistoryPanel({
   formatDuration,
   compact = false
 }: SessionHistoryPanelProps & { compact?: boolean }) {
+  const showCombinedEmptyState =
+    showTranscriptViewer &&
+    !transcriptViewer.session &&
+    !transcriptViewer.isLoading &&
+    !transcriptViewer.error &&
+    !isLoadingSessions &&
+    sessions.length === 0;
+
   return (
     <section className={`history-section utility-surface ${compact ? "utility-surface-compact" : ""}`.trim()}>
       <div className={`section-heading utility-section-heading ${compact ? "compact-mode" : ""}`.trim()}>
         {!compact ? <div><h2>Session history</h2></div> : <span />}
         {!compact ? <span className="section-chip">{sessions.length}</span> : null}
       </div>
-      <div className="history-list">
-        {isLoadingSessions ? <p className="history-empty">Loading recent sessions...</p> : null}
-        {!isLoadingSessions && sessions.length === 0 ? <p className="history-empty">No previous sessions yet.</p> : null}
-        {sessions.map((session) => (
-          <article className="history-item" key={session.id}>
-            <p className="history-repo">{session.repoPath}</p>
-            <p className="history-meta">
-              <span>{new Date(session.startTime).toLocaleString()}</span>
-              <span>{formatDuration(session.durationMs)}</span>
-            </p>
-            <div className="history-actions">
-              <button type="button" className="ghost" onClick={() => onViewTranscript(session)}>
-                View transcript
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
+      {!showCombinedEmptyState ? (
+        <div className="history-list">
+          {isLoadingSessions ? <p className="history-empty">Loading recent sessions...</p> : null}
+          {!isLoadingSessions && sessions.length === 0 ? <p className="history-empty">No previous sessions yet.</p> : null}
+          {sessions.map((session) => (
+            <article className="history-item" key={session.id}>
+              <p className="history-repo">{session.repoPath}</p>
+              <p className="history-meta">
+                <span>{new Date(session.startTime).toLocaleString()}</span>
+                <span>{formatDuration(session.durationMs)}</span>
+              </p>
+              <div className="history-actions">
+                <button type="button" className="ghost" onClick={() => onViewTranscript(session)}>
+                  View transcript
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
       {showTranscriptViewer && transcriptViewer.session ? (
         <div className="transcript-viewer">
           <div className="transcript-header">
@@ -1209,6 +1189,11 @@ export function SessionHistoryPanel({
             <pre className="transcript-panel">{transcriptViewer.transcript || "Transcript is empty."}</pre>
           ) : null}
         </div>
+      ) : showCombinedEmptyState ? (
+        <div className="transcript-empty-state transcript-empty-state-single">
+          <strong>No transcript yet</strong>
+          <p>Finish a session to review output here.</p>
+        </div>
       ) : showTranscriptViewer ? (
         <div className="transcript-empty-state">
           <strong>No transcript yet</strong>
@@ -1224,18 +1209,12 @@ function ResultsSummaryCard({
   sessionActivity,
   latestSession,
   repoInsightsPanel,
-  onOpenTranscript,
-  onOpenChanges,
-  onPrepareNextPrompt,
   formatDuration
 }: {
   sessionBanner: ConsoleViewProps["sessionBanner"];
   sessionActivity: ConsoleViewProps["sessionActivity"];
   latestSession: ConsoleViewProps["latestSession"];
   repoInsightsPanel: ConsoleViewProps["repoInsightsPanel"];
-  onOpenTranscript(): void;
-  onOpenChanges(): void;
-  onPrepareNextPrompt(): void;
   formatDuration(durationMs: number | null): string;
 }) {
   const endedAt =
@@ -1247,7 +1226,6 @@ function ResultsSummaryCard({
     latestSession?.durationMs !== null && latestSession?.durationMs !== undefined
       ? formatDuration(latestSession.durationMs)
       : formatElapsedDuration(sessionActivity.startedAt, endedAt);
-  const transcriptAvailable = Boolean(latestSession);
   const changesAvailable = Boolean(
     repoInsightsPanel.diffPanelText ||
       repoInsightsPanel.diffEmptyState ||
@@ -1256,24 +1234,17 @@ function ResultsSummaryCard({
           repoInsightsPanel.gitStatus.stagedFilesCount > 0 ||
           repoInsightsPanel.gitStatus.untrackedFilesCount > 0))
   );
-  const primaryActionLabel =
-    sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "Review what happened" : "Review transcript";
-  const secondaryActionLabel =
-    sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "Prepare next prompt" : "Write next prompt";
-
   return (
     <section className="results-summary-card workspace-card">
       <div className="section-heading">
         <div>
-          <p className="section-kicker">Results</p>
           <h2>{sessionBanner.title}</h2>
         </div>
         <span className="section-chip">{formatSessionBannerStateLabel(sessionBanner.state)}</span>
       </div>
-      <p className="results-summary-copy">{sessionBanner.detail}</p>
       <div className="results-summary-grid">
-        <article className="meta-pill">
-          <span className="meta-label">Completed at</span>
+          <article className="meta-pill">
+            <span className="meta-label">Completed at</span>
           <strong>{endedAt ? new Date(endedAt).toLocaleString() : "Waiting for final output"}</strong>
         </article>
         <article className="meta-pill">
@@ -1286,23 +1257,11 @@ function ResultsSummaryCard({
             {sessionActivity.lastActivityAt ? new Date(sessionActivity.lastActivityAt).toLocaleString() : "Not available"}
           </strong>
         </article>
-        <article className="meta-pill">
-          <span className="meta-label">Repo changes</span>
-          <strong>{changesAvailable ? "Available to inspect" : "No changes detected yet"}</strong>
-        </article>
-      </div>
-      <div className="results-summary-actions">
-        <button type="button" onClick={onOpenTranscript} disabled={!transcriptAvailable}>
-          {primaryActionLabel}
-        </button>
-        <button type="button" className="secondary" onClick={onPrepareNextPrompt}>
-          {secondaryActionLabel}
-        </button>
-        <button type="button" className="ghost" onClick={onOpenChanges}>
-          {changesAvailable ? "Review changes" : "Check changes"}
-        </button>
-      </div>
-      <p className="helper-text results-next-step">{getSuggestedNextAction(sessionBanner)}</p>
+          <article className="meta-pill">
+            <span className="meta-label">Repo changes</span>
+            <strong>{changesAvailable ? "Available to inspect" : "No changes detected yet"}</strong>
+          </article>
+        </div>
     </section>
   );
 }
@@ -1315,14 +1274,14 @@ function UtilityPanel({
   repoInsightsPanel,
   sessionHistoryPanel
 }: {
-  utilityMode: "context" | "history" | "transcript" | "changes";
-  onUtilityModeChange(nextMode: "context" | "history" | "transcript" | "changes"): void;
+  utilityMode: "context" | "transcript" | "changes";
+  onUtilityModeChange(nextMode: "context" | "transcript" | "changes"): void;
   onCloseInspector(): void;
   pendingContextPanel: ConsoleViewProps["pendingContextPanel"];
   repoInsightsPanel: ConsoleViewProps["repoInsightsPanel"];
   sessionHistoryPanel: ConsoleViewProps["sessionHistoryPanel"];
 }) {
-  const utilityTabButtons = (["context", "history", "transcript", "changes"] as const).map((mode) => (
+  const utilityTabButtons = (["context", "transcript", "changes"] as const).map((mode) => (
     <button
       key={mode}
       type="button"
@@ -1352,7 +1311,6 @@ function UtilityPanel({
       <div className="utility-panel-body">
         {utilityMode === "context" ? <PendingContextPanel {...pendingContextPanel} compact /> : null}
         {utilityMode === "changes" ? <RepoInsightsPanel {...repoInsightsPanel} compact /> : null}
-        {utilityMode === "history" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer={false} compact /> : null}
         {utilityMode === "transcript" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer compact /> : null}
       </div>
     </section>
@@ -1371,7 +1329,7 @@ function ApprovalActionStrip({
   const isApproval = sessionBanner.state === "awaiting-approval";
 
   return (
-    <section className={`approval-action-strip ${isApproval ? "approval-pending" : "awaiting-input-strip"}`}>
+    <section className={`approval-action-strip ${isApproval ? "approval-pending approval" : "awaiting-input-strip"}`}>
       <div className="approval-action-copy">
         <strong>{isApproval ? "Codex is waiting for approval" : "Codex is waiting for your next instruction"}</strong>
         <p>
@@ -1415,7 +1373,6 @@ export function ConsoleView({
   const projectTitle = formatProjectTitle(projectControls.repoPath, projectControls.defaultRepoRoot);
   const projectSubtitle = buildProjectSubtitle(projectControls.repoPath, projectControls.defaultRepoRoot);
   const terminalGuidance = buildTerminalGuidance(sessionBanner);
-  const hasResults = isResultsWorkspaceState(workspaceState) || Boolean(latestSession);
   const showResultsSummary = page === "workspace" && isResultsWorkspaceState(workspaceState);
   const showTerminalGuidance =
     sessionBanner.state === "awaiting-approval" ||
@@ -1435,10 +1392,6 @@ export function ConsoleView({
       return <RepoInsightsPanel {...repoInsightsPanel} />;
     }
 
-    if (page === "history") {
-      return <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer={false} />;
-    }
-
     if (page === "transcript") {
       return <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer />;
     }
@@ -1449,62 +1402,47 @@ export function ConsoleView({
   return (
     <div className={`console-layout page-${page} workspace-state-${workspaceState}`.trim()}>
       <aside className="control-rail">
-        <ProjectRail
-          page={page}
-          workspaceState={workspaceState}
-          onSelectPage={onSelectPage}
-          projectTitle={projectTitle}
-          projectSubtitle={projectSubtitle}
-          hasProjectPath={projectControls.repoPath.trim().length > 0}
-          readiness={projectControls.readiness}
-          recentProjectCount={projectControls.recentProjects.length}
-          readyPendingItemCount={pendingContextPanel.readyPendingItemCount}
-          hasActiveSession={status.active}
-          connectionStateLabel={projectControls.connectionStateLabel}
-          onStartSession={projectControls.onStartSession}
-          onStopSession={projectControls.onStopSession}
-        />
+          <ProjectRail
+            page={page}
+            onSelectPage={onSelectPage}
+            projectTitle={projectTitle}
+            projectSubtitle={projectSubtitle}
+            hasProjectPath={projectControls.repoPath.trim().length > 0}
+            readiness={projectControls.readiness}
+            recentProjectCount={projectControls.recentProjects.length}
+            readyPendingItemCount={pendingContextPanel.readyPendingItemCount}
+            hasActiveSession={status.active}
+            onStartSession={projectControls.onStartSession}
+            onStopSession={projectControls.onStopSession}
+          />
       </aside>
 
       <main className="workspace-main workspace-page-shell">
         {showProjectPage ? <ProjectControls {...projectControls} /> : null}
 
-        <section
-          className={`workspace-surface ${showWorkspacePage ? "" : "workspace-surface-hidden"}`.trim()}
-          aria-hidden={!showWorkspacePage}
-        >
-            <section className="workspace-page-header">
-              <div>
-                <p className="section-kicker">Workspace</p>
-                <h2>{status.active ? "Live workspace" : "Workspace"}</h2>
-              </div>
-              <span
-                className={`section-chip workspace-state-pill ${
-                  !status.active && projectControls.readiness?.overallStatus
-                    ? `status-pill-${projectControls.readiness.overallStatus}`
-                    : ""
-                }`.trim()}
-              >
-                {!status.active && projectControls.readiness?.overallStatus === "passed"
-                  ? "Ready"
-                  : !status.active && projectControls.readiness?.overallStatus === "failed"
-                    ? "Failed"
-                    : !status.active && projectControls.readiness?.overallStatus === "warning"
-                      ? "Warning"
-                      : formatWorkspaceStateLabel(workspaceState)}
-              </span>
-            </section>
-            <div className="workspace-content-stack terminal-first">
-              <div className="workspace-region workspace-region-composer">
-                <ComposerPanel {...composerPanel} />
-              </div>
+          <section
+            className={`workspace-surface ${showWorkspacePage ? "" : "workspace-surface-hidden"}`.trim()}
+            aria-hidden={!showWorkspacePage}
+          >
+            <div className="workspace-content-stack">
+              {showResultsSummary ? (
+                <div className="workspace-region workspace-region-results">
+                  <ResultsSummaryCard
+                    sessionBanner={sessionBanner}
+                    sessionActivity={sessionActivity}
+                    latestSession={latestSession}
+                    repoInsightsPanel={repoInsightsPanel}
+                    formatDuration={sessionHistoryPanel.formatDuration}
+                  />
+                </div>
+              ) : null}
 
               <section
                 className={`terminal-section workspace-card workspace-region workspace-region-terminal ${status.active ? "terminal-section-live" : ""}`.trim()}
               >
-                <div
-                  className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
-                    sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
+                  <div
+                    className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
+                      sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
                   }`}
                   data-session-state={sessionBanner.state}
                 >
@@ -1525,38 +1463,20 @@ export function ConsoleView({
                       </p>
                     </div>
                   </div>
-                  {showTerminalGuidance && terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
-                  <div ref={terminalContainerRef} className="terminal-panel" />
-                </div>
+                    {showTerminalGuidance && terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
+                    <div ref={terminalContainerRef} className="terminal-panel" />
+                  </div>
               </section>
+
+              <div className="workspace-region workspace-region-composer">
+                <ComposerPanel {...composerPanel} />
+              </div>
 
               <div className="workspace-region workspace-region-approval">
                 <ApprovalActionStrip sessionBanner={sessionBanner} />
               </div>
-
-              {showResultsSummary ? (
-                <div className="workspace-region workspace-region-results">
-                  <ResultsSummaryCard
-                    sessionBanner={sessionBanner}
-                    sessionActivity={sessionActivity}
-                    latestSession={latestSession}
-                    repoInsightsPanel={repoInsightsPanel}
-                    onOpenTranscript={() => onSelectPage("transcript")}
-                    onOpenChanges={() => onSelectPage("changes")}
-                    onPrepareNextPrompt={() => {
-                      onSelectPage("workspace");
-                      const promptInput = document.getElementById("prompt-input");
-                      if (promptInput instanceof HTMLTextAreaElement) {
-                        promptInput.focus();
-                        promptInput.scrollIntoView?.({ block: "center", behavior: "smooth" });
-                      }
-                    }}
-                    formatDuration={sessionHistoryPanel.formatDuration}
-                  />
-                </div>
-              ) : null}
             </div>
-        </section>
+          </section>
 
         {showReviewPage ? (
           <section className="review-page">
@@ -1564,9 +1484,10 @@ export function ConsoleView({
               <div>
                 <p className="section-kicker">Review</p>
                 <h2>{formatUtilityModeLabel(page)}</h2>
+                <p className="review-page-summary">{buildReviewPageSummary(page)}</p>
               </div>
             </div>
-            {reviewContent}
+            <div className="review-page-body">{reviewContent}</div>
           </section>
         ) : null}
       </main>

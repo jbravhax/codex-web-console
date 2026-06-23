@@ -12,7 +12,7 @@ export type WorkspaceState =
   | "disconnected"
   | "stopped";
 export type WorkspaceSection = "compose" | "live-run" | "results";
-export type UtilityMode = "context" | "history" | "transcript" | "changes";
+export type UtilityMode = "context" | "transcript" | "changes";
 
 type WorkspaceStateInput = {
   sessionBannerState: SessionBannerState;
@@ -91,11 +91,11 @@ export function recommendUtilityMode({
       return "transcript";
     }
 
-    return hasRepoChanges ? "changes" : "history";
+    return hasRepoChanges ? "changes" : "transcript";
   }
 
   if (isLiveRunWorkspaceState(workspaceState)) {
-    return hasRepoChanges ? "changes" : "history";
+    return hasRepoChanges ? "changes" : "transcript";
   }
 
   if (readyPendingItemCount > 0) {
@@ -103,8 +103,8 @@ export function recommendUtilityMode({
   }
 
   if (hasTranscriptHistory) {
-    return "history";
+    return "transcript";
   }
 
-  return surface === "project" ? "history" : "context";
+  return surface === "project" ? "transcript" : "context";
 }

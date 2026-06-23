@@ -97,7 +97,7 @@ describe("workflow-phase", () => {
         hasLoadedTranscript: false,
         hasRepoChanges: false
       })
-    ).toBe("history");
+    ).toBe("transcript");
 
     expect(
       recommendUtilityMode({

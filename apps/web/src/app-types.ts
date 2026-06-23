@@ -148,7 +148,6 @@ export type PendingContextPanelProps = {
 
 export type ComposerPanelProps = {
   status: SessionStatus;
-  sessionBanner: SessionBanner;
   promptText: string;
   onPromptTextChange(nextPrompt: string): void;
   onPromptPaste(content: React.ClipboardEvent<HTMLTextAreaElement>): void | Promise<void>;
@@ -212,4 +211,7 @@ export type ConsoleHeaderProps = {
   sessionActivity: SessionActivitySummary;
   connectionStateLabel: string;
   hasActiveSession: boolean;
+  canStartSession: boolean;
+  onStartSession(): void;
+  onStopSession(): void;
 };

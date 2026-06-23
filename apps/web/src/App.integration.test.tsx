@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import * as clipboardModule from "./clipboard";
@@ -251,14 +251,14 @@ function createDeferredPromise<T>() {
   return { promise, resolve };
 }
 
-function getMenuButton(name: "Workspace" | "Project" | "Context" | "History" | "Transcript" | "Changes") {
+function getMenuButton(name: "Workspace" | "Project" | "Context" | "Transcript" | "Changes") {
   const nav = screen.getByRole("navigation", { name: "Primary navigation" });
   return within(nav).getByRole("button", {
     name: (accessibleName) => accessibleName.trim().startsWith(name)
   });
 }
 
-async function openMenuPage(name: "Context" | "History" | "Transcript" | "Changes" | "Project" | "Workspace") {
+async function openMenuPage(name: "Context" | "Transcript" | "Changes" | "Project" | "Workspace") {
   fireEvent.click(getMenuButton(name));
   await waitFor(() => {
     expect(getMenuButton(name).className).toContain("selected");
@@ -378,7 +378,7 @@ describe("App integration", () => {
     fireEvent.click(getMenuButton("Workspace"));
     expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
     expect(screen.queryByText("Project setup")).toBeNull();
-    expect(screen.getByLabelText("Workspace status")).toBeTruthy();
+    expect(screen.getByText("Passed")).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
     expect(await screen.findByText("Codex terminal")).toBeTruthy();
@@ -415,6 +415,7 @@ describe("App integration", () => {
     });
 
     expect((await screen.findAllByText("Session stopped")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(/The stop request finished and Codex exited/i)).toBeNull();
   });
 
   it("blocks session start when readiness reports a hard failure", async () => {
@@ -550,6 +551,50 @@ describe("App integration", () => {
     expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
   });
 
+  it("submits with Enter and keeps Shift+Enter available for a new line", async () => {
+    const socket = renderApp();
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Codex terminal")).toBeTruthy();
+
+    const prompt = screen.getByLabelText("Prompt");
+    fireEvent.change(prompt, {
+      target: {
+        value: "Reply with exactly: OK"
+      }
+    });
+
+    const submitEvent = createEvent.keyDown(prompt, { key: "Enter", code: "Enter" });
+    fireEvent(prompt, submitEvent);
+    expect(submitEvent.defaultPrevented).toBe(true);
+
+    await waitFor(() => {
+      expect(socket.sent).toContain(
+        JSON.stringify({
+          type: "input",
+          data: buildPromptPasteInput("Reply with exactly: OK")
+        })
+      );
+      expect(socket.sent).toContain(
+        JSON.stringify({
+          type: "input",
+          data: buildPromptSubmitInput()
+        })
+      );
+    });
+
+    fireEvent.change(prompt, {
+      target: {
+        value: "Line one"
+      }
+    });
+
+    const beforeShiftEnter = socket.sent.length;
+    const newlineEvent = createEvent.keyDown(prompt, { key: "Enter", code: "Enter", shiftKey: true });
+    fireEvent(prompt, newlineEvent);
+    expect(newlineEvent.defaultPrevented).toBe(false);
+    expect(socket.sent).toHaveLength(beforeShiftEnter);
+  });
+
   it("shows explicit browser guidance when codex is waiting for input, completed, or disconnected", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
@@ -566,8 +611,10 @@ describe("App integration", () => {
       payload: "Created only README.md.\n\n─ Worked for 1m 23s ─"
     });
     expect((await screen.findAllByText("Request completed")).length).toBeGreaterThanOrEqual(1);
-    expect((await screen.findAllByText("Completed at")).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/send the next prompt when you're ready/i).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(document.querySelector(".results-summary-card")).toBeTruthy();
+    });
+    expect(screen.getByText(/The latest session output stays here while you review it/i)).toBeTruthy();
 
     socket.emitClose({ code: 1006, reason: "server stopped" });
     expect((await screen.findAllByText("Disconnected")).length).toBeGreaterThanOrEqual(1);
@@ -725,7 +772,9 @@ describe("App integration", () => {
     });
 
     expect((await screen.findAllByText("Session completed")).length).toBeGreaterThanOrEqual(1);
-    expect((await screen.findAllByText("Completed at")).length).toBeGreaterThanOrEqual(1);
+    await waitFor(() => {
+      expect(document.querySelector(".results-summary-card")).toBeTruthy();
+    });
     expect((await screen.findAllByText("Last activity")).length).toBeGreaterThanOrEqual(1);
   });
 
@@ -746,14 +795,12 @@ describe("App integration", () => {
     await openMenuPage("Context");
     expect(await screen.findByText("No context added yet. Start a session first.")).toBeTruthy();
 
-    await openMenuPage("History");
+    await openMenuPage("Transcript");
     await waitFor(() => {
       expect(screen.queryByText("Loading recent sessions...")).toBeNull();
     });
-    expect(await screen.findByText("No previous sessions yet.")).toBeTruthy();
-
-    await openMenuPage("Transcript");
-    expect(await screen.findByText("Finish a session to review output.")).toBeTruthy();
+    expect(await screen.findByText("No transcript yet")).toBeTruthy();
+    expect(screen.getByText("Finish a session to review output here.")).toBeTruthy();
 
     await openMenuPage("Changes");
     expect(await screen.findByText("No changes yet. Start a session to inspect the project.")).toBeTruthy();
@@ -843,14 +890,14 @@ describe("App integration", () => {
       }
     });
 
-    await openMenuPage("History");
+    await openMenuPage("Transcript");
     const transcriptButtons = await screen.findAllByRole("button", { name: "View transcript" });
 
     fireEvent.click(transcriptButtons[0]);
     expect(await screen.findByText("Loading transcript...")).toBeTruthy();
     expect(await screen.findByText("session transcript text")).toBeTruthy();
 
-    await openMenuPage("History");
+    await openMenuPage("Transcript");
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[1]);
     expect(await screen.findByText("Session transcript not found.")).toBeTruthy();
   });
@@ -1028,7 +1075,6 @@ describe("App integration", () => {
 
     await openMenuPage("Context");
     await openMenuPage("Transcript");
-    await openMenuPage("History");
     await openMenuPage("Changes");
     await openMenuPage("Workspace");
     expect(screen.getByText("Codex terminal")).toBeTruthy();
@@ -1066,7 +1112,7 @@ describe("App integration", () => {
     });
 
     await openMenuPage("Workspace");
-    expect((await screen.findAllByText("Results")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText(/completed/i)).length).toBeGreaterThan(0);
     await openMenuPage("Project");
     expect(await screen.findByText("Project setup")).toBeTruthy();
   });
@@ -1099,9 +1145,10 @@ describe("App integration", () => {
       payload: "Created only README.md.\n\nâ”€ Worked for 1m 23s â”€"
     });
 
-    expect((await screen.findAllByText("Results")).length).toBeGreaterThanOrEqual(1);
-    expect(await screen.findByText("Review transcript")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Write next prompt" }));
+    expect((await screen.findAllByText("Request completed")).length).toBeGreaterThanOrEqual(1);
+    await waitFor(() => {
+      expect(document.querySelector(".results-summary-card")).toBeTruthy();
+    });
     expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
   });
 });
