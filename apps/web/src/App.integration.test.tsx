@@ -276,7 +276,7 @@ describe("App integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choose folder" }));
 
     expect(await screen.findByText(REPO_PICKER_UNSUPPORTED_MESSAGE)).toBeTruthy();
-    expect(screen.getByText(/Paste one specific project path/i)).toBeTruthy();
+    expect(screen.getByText(/Use one real project folder/i)).toBeTruthy();
   });
 
   it("shows environment readiness details for the selected project", async () => {
@@ -317,7 +317,7 @@ describe("App integration", () => {
 
     fireEvent.click(within(readinessSection).getByRole("button", { name: "Show" }));
     expect(await screen.findByText("Git is not available on this machine right now.")).toBeTruthy();
-    expect(screen.getByText("This project can start a session.")).toBeTruthy();
+    expect(screen.getByText("Ready to start.")).toBeTruthy();
   });
 
   it("creates a new project folder and reuses the chosen path for session start", async () => {
@@ -344,7 +344,7 @@ describe("App integration", () => {
   it("walks the session banner through idle, starting, running, stopping, and stopped states", async () => {
     const socket = renderApp();
 
-    expect(await screen.findByText("Idle")).toBeTruthy();
+    expect(await screen.findByText("Connected. Ready to start a Codex session.")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
@@ -352,14 +352,13 @@ describe("App integration", () => {
       }
     });
     fireEvent.click(screen.getByRole("button", { name: "Start session" }));
-    expect(await screen.findByText("Starting session")).toBeTruthy();
-    expect(await screen.findByText("Started at")).toBeTruthy();
+    expect(await screen.findByText(/Starting Codex in \/workspace\/default-project/i)).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Session running")).toBeTruthy();
+    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Stop session" }));
-    expect(screen.getByText("Stopping session")).toBeTruthy();
+    expect(screen.getAllByText("Stopping session").length).toBeGreaterThanOrEqual(1);
 
     socket.emitMessage({
       type: "exit",
@@ -467,7 +466,7 @@ describe("App integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Send prompt" }));
 
-    expect(await screen.findByText("Running request")).toBeTruthy();
+    expect((await screen.findAllByText("Running request")).length).toBeGreaterThanOrEqual(1);
     expect(socket.sent).toContain(
       JSON.stringify({
         type: "input",
@@ -479,7 +478,7 @@ describe("App integration", () => {
       type: "output",
       payload: "Would you like to run the following command?\nPress enter to confirm"
     });
-    expect(await screen.findByText("Waiting for approval")).toBeTruthy();
+    expect((await screen.findAllByText("Waiting for approval")).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/approve in the terminal and work will continue automatically/i).length).toBeGreaterThan(0);
     expect(document.querySelector('[data-session-state="awaiting-approval"]')).toBeTruthy();
 
@@ -487,7 +486,7 @@ describe("App integration", () => {
       type: "output",
       payload: "Created only README.md."
     });
-    expect(await screen.findByText("Codex is responding")).toBeTruthy();
+    expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows explicit browser guidance when codex is waiting for input, completed, or disconnected", async () => {
@@ -498,7 +497,7 @@ describe("App integration", () => {
       type: "output",
       payload: "› Run /review on my current changes"
     });
-    expect(await screen.findByText("Waiting for your next input")).toBeTruthy();
+    expect((await screen.findAllByText("Waiting for your next input")).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/waiting for your next instruction/i).length).toBeGreaterThan(0);
 
     socket.emitMessage({
@@ -507,7 +506,7 @@ describe("App integration", () => {
     });
     expect((await screen.findAllByText("Request completed")).length).toBeGreaterThanOrEqual(1);
     expect((await screen.findAllByText("Completed at")).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/send another prompt when you're ready/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/send the next prompt when you're ready/i).length).toBeGreaterThan(0);
 
     socket.emitClose({ code: 1006, reason: "server stopped" });
     expect((await screen.findAllByText("Disconnected")).length).toBeGreaterThanOrEqual(1);
@@ -572,7 +571,7 @@ describe("App integration", () => {
     renderApp();
 
     expect(screen.queryByText("Initialize Git repository")).toBeNull();
-    expect(screen.queryByText("Projects you open will appear here.")).toBeNull();
+    expect(screen.queryByText("No previous projects yet.")).toBeNull();
 
     const createProjectSection = screen.getByText("Create new project").closest("section");
     if (!createProjectSection) {
@@ -588,7 +587,7 @@ describe("App integration", () => {
     }
 
     fireEvent.click(within(recentProjectsSection).getByRole("button", { name: "Show" }));
-    expect(await screen.findByText("Projects you open will appear here.")).toBeTruthy();
+    expect(await screen.findByText("No previous projects yet.")).toBeTruthy();
   });
 
   it("shows clear guidance when the selected folder looks like a broad parent directory", async () => {
@@ -669,7 +668,7 @@ describe("App integration", () => {
   it("shows an empty preview state when nothing is queued", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Session running")).toBeTruthy();
+    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
 
@@ -677,10 +676,25 @@ describe("App integration", () => {
     expect(screen.getByText("Nothing will be sent yet. Add a prompt or context to build the final message.")).toBeTruthy();
   });
 
+  it("shows intentional empty states in each utility mode", async () => {
+    renderApp();
+
+    expect(await screen.findByText("No context added yet. Start a session first.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "History" }));
+    expect(await screen.findByText("No previous sessions yet.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Transcript" }));
+    expect(await screen.findByText("Finish a session to review output.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Changes" }));
+    expect(await screen.findByText("No changes yet. Start a session to inspect the project.")).toBeTruthy();
+  });
+
   it("saves large pasted text as document context and explains the file reference", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Session running")).toBeTruthy();
+    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.paste(screen.getByLabelText("Prompt"), {
       clipboardData: {
@@ -697,7 +711,7 @@ describe("App integration", () => {
   it("shows a friendly large-paste failure message", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Session running")).toBeTruthy();
+    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.paste(screen.getByLabelText("Prompt"), {
       clipboardData: {
@@ -716,7 +730,7 @@ describe("App integration", () => {
   it("clears all pending context after adding a saved document", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Session running")).toBeTruthy();
+    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.paste(screen.getByLabelText("Prompt"), {
       clipboardData: {
@@ -928,6 +942,6 @@ describe("App integration", () => {
 
     expect((await screen.findAllByText("Results")).length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText("Transcript available")).toBeTruthy();
-    expect(await screen.findByText("Open transcript")).toBeTruthy();
+    expect(await screen.findByText("Review transcript")).toBeTruthy();
   });
 });

@@ -1189,11 +1189,11 @@ export function App() {
   };
 
   const pendingContextEmptyState = !status.active
-    ? "Start a session in a real project folder, then add documents, files, images, or ZIP context for Codex."
-    : "Paste text, drop files, upload images, or add a ZIP for Codex to inspect.";
+    ? "No context added yet. Start a session first."
+    : "No context added yet.";
   const promptPreviewSummary = generatedPromptPreview.trim()
     ? `${promptText.trim() ? "Prompt ready" : "Context ready"} with ${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"} prepared for Codex.`
-    : "Nothing will be sent yet. Add a prompt or context to preview the final message.";
+    : "Nothing will be sent yet.";
 
   return (
     <div className="app-shell">
@@ -1202,6 +1202,9 @@ export function App() {
         onChangeView={setActiveView}
         sessionBanner={sessionBanner}
         sessionActivity={sessionActivity}
+        onDisconnect={stopSession}
+        connectionStateLabel={formatConnectionState(connectionState)}
+        hasActiveSession={status.active}
       />
 
       {activeView === "console" ? (

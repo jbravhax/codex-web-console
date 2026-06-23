@@ -116,19 +116,6 @@ function buildSessionMomentRows(
   return rows;
 }
 
-function formatWorkflowPhaseLabel(phase: ConsoleViewProps["workflowPhase"]): string {
-  switch (phase) {
-    case "project":
-      return "Project";
-    case "compose":
-      return "Compose";
-    case "live-run":
-      return "Live Run";
-    case "results":
-      return "Results";
-  }
-}
-
 function formatUtilityModeLabel(mode: ConsoleViewProps["utilityMode"]): string {
   switch (mode) {
     case "context":
@@ -178,14 +165,44 @@ function formatElapsedDuration(startedAt: string | null, endedAt: string | null)
   return `${minutes}m ${seconds}s`;
 }
 
+function formatLiveDuration(startedAt: string | null, endedAt?: string | null): string | null {
+  if (!startedAt) {
+    return null;
+  }
+
+  return formatElapsedDuration(startedAt, endedAt ?? new Date().toISOString());
+}
+
+function formatProjectTitle(repoPath: string, defaultRepoRoot: string): string {
+  const normalizedPath = repoPath.trim() || defaultRepoRoot.trim();
+  if (!normalizedPath) {
+    return "Choose a project";
+  }
+
+  const pathParts = normalizedPath.split(/[/\\]/).filter(Boolean);
+  return pathParts[pathParts.length - 1] ?? normalizedPath;
+}
+
+function buildProjectSubtitle(repoPath: string, defaultRepoRoot: string): string {
+  const normalizedPath = repoPath.trim() || defaultRepoRoot.trim();
+  return normalizedPath || "Paste a project path or use the folder picker.";
+}
+
 type CollapsibleSectionProps = {
   title: string;
   subtitle?: string;
   defaultExpanded?: boolean;
+  className?: string;
   children: ReactNode;
 };
 
-function CollapsibleSection({ title, subtitle, defaultExpanded = false, children }: CollapsibleSectionProps) {
+function CollapsibleSection({
+  title,
+  subtitle,
+  defaultExpanded = false,
+  className,
+  children
+}: CollapsibleSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   useEffect(() => {
@@ -195,7 +212,7 @@ function CollapsibleSection({ title, subtitle, defaultExpanded = false, children
   }, [defaultExpanded]);
 
   return (
-    <section className={`collapsible-section ${isExpanded ? "expanded" : ""}`}>
+    <section className={`collapsible-section ${isExpanded ? "expanded" : ""} ${className ?? ""}`.trim()}>
       <div className="collapsible-section-header">
         <div>
           <strong>{title}</strong>
@@ -210,42 +227,100 @@ function CollapsibleSection({ title, subtitle, defaultExpanded = false, children
   );
 }
 
-export function ConsoleHeader({ activeView, onChangeView, sessionBanner, sessionActivity }: ConsoleHeaderProps) {
+export function ConsoleHeader({
+  activeView,
+  onChangeView,
+  sessionBanner,
+  sessionActivity,
+  onDisconnect,
+  connectionStateLabel,
+  hasActiveSession
+}: ConsoleHeaderProps) {
   const sessionMoments = buildSessionMomentRows(sessionBanner, sessionActivity);
+  const isExceptionalBannerState =
+    sessionBanner.state === "awaiting-approval" ||
+    sessionBanner.state === "awaiting-input" ||
+    sessionBanner.state === "disconnected" ||
+    sessionBanner.state === "failed";
+  const liveDuration = formatLiveDuration(
+    sessionActivity.startedAt,
+    sessionActivity.completedAt ||
+      sessionActivity.failedAt ||
+      sessionActivity.disconnectedAt ||
+      (sessionBanner.state === "idle" ? sessionActivity.startedAt : null)
+  );
+  const showApprovalBadge = sessionBanner.state === "awaiting-approval";
+  const showRunningIndicator =
+    sessionBanner.state === "running" || sessionBanner.state === "starting" || sessionBanner.state === "awaiting-approval";
+  const showDisconnect = activeView === "console";
 
   return (
     <>
-      <header className="page-header">
-        <div className="page-header-copy">
-          <p className="eyebrow">Local only</p>
-          <h1>Codex CLI Web Console</h1>
-          <p className="page-header-subtitle">A calm browser workspace for the Codex CLI running on this machine.</p>
-        </div>
-        <div className="header-actions">
-          <div className="tab-row">
-            <button
-              type="button"
-              className={activeView === "console" ? "tab-button active" : "tab-button secondary"}
-              onClick={() => onChangeView("console")}
-            >
-              Console
-            </button>
-            <button
-              type="button"
-              className={activeView === "settings" ? "tab-button active" : "tab-button secondary"}
-              onClick={() => onChangeView("settings")}
-            >
-              Settings
-            </button>
+      <header className="top-status-bar">
+        <div className="top-status-brand">
+          <div className="traffic-lights" aria-hidden="true">
+            <span className="traffic-light red" />
+            <span className="traffic-light amber" />
+            <span className="traffic-light green" />
           </div>
+          <button
+            type="button"
+            className={activeView === "console" ? "app-switcher active" : "app-switcher secondary"}
+            onClick={() => onChangeView("console")}
+          >
+            Console
+          </button>
+          <div className="page-header-copy">
+            <h1>Codex Console</h1>
+          </div>
+        </div>
+        <div className="top-status-center">
+          <div className="top-status-chip">
+            <span className="top-status-label">Session</span>
+            <strong>{hasActiveSession ? sessionBanner.title : connectionStateLabel}</strong>
+          </div>
+          {showRunningIndicator ? (
+            <div className="top-status-chip top-status-running">
+              <span className="top-status-dot" aria-hidden="true" />
+              <strong>Running</strong>
+            </div>
+          ) : null}
+          {liveDuration ? (
+            <div className="top-status-chip">
+              <span className="top-status-label">Duration</span>
+              <strong>{liveDuration}</strong>
+            </div>
+          ) : null}
+          {showApprovalBadge ? (
+            <div className="top-status-chip top-status-approval">
+              <strong>Waiting for approval</strong>
+            </div>
+          ) : null}
+        </div>
+        <div className="header-actions top-status-actions">
+          <button
+            type="button"
+            className={activeView === "settings" ? "app-switcher active" : "app-switcher secondary"}
+            onClick={() => onChangeView("settings")}
+          >
+            Settings
+          </button>
+          {showDisconnect ? (
+            <button type="button" className="disconnect-button" onClick={onDisconnect}>
+              Disconnect
+            </button>
+          ) : null}
         </div>
       </header>
 
-      <section className={`session-banner session-banner-${sessionBanner.state}`} aria-live="polite">
+      <section
+        className={`session-banner ${isExceptionalBannerState ? "session-banner-exception" : "session-banner-routine"} session-banner-${sessionBanner.state}`}
+        aria-live="polite"
+      >
         <div className="session-banner-copy">
-          <strong>{sessionBanner.title}</strong>
+          {isExceptionalBannerState ? <strong>{sessionBanner.title}</strong> : null}
           <p>{sessionBanner.detail}</p>
-          {sessionMoments.length > 0 ? (
+          {sessionMoments.length > 0 && (isExceptionalBannerState || sessionBanner.state === "completed") ? (
             <div className="session-banner-metadata">
               {sessionMoments.map((row) => (
                 <span key={row.label} className="session-banner-metadata-item">
@@ -256,7 +331,9 @@ export function ConsoleHeader({ activeView, onChangeView, sessionBanner, session
             </div>
           ) : null}
         </div>
-        <span className="session-banner-state">{formatSessionBannerStateLabel(sessionBanner.state)}</span>
+        {isExceptionalBannerState ? (
+          <span className="session-banner-state">{formatSessionBannerStateLabel(sessionBanner.state)}</span>
+        ) : null}
       </section>
     </>
   );
@@ -284,23 +361,47 @@ export function ProjectControls({
   recentProjects,
   isLoadingRecentProjects
 }: ProjectControlsProps) {
+  const [isCreateProjectExpanded, setIsCreateProjectExpanded] = useState(false);
+  const readinessHasWarningsOrFailures = Boolean(
+    readiness && readiness.items.some((item) => item.status === "warning" || item.status === "failed")
+  );
+  const projectTitle = formatProjectTitle(repoPath, defaultRepoRoot);
+  const projectSubtitle = buildProjectSubtitle(repoPath, defaultRepoRoot);
   const readinessSummary = !repoPath.trim()
-    ? "Choose one project folder to run a quick check."
+    ? "Choose a project to check readiness."
     : readiness
-      ? `${formatReadinessStatusLabel(readiness.overallStatus)}. ${
-          readiness.canStart ? "Ready to start." : "Needs attention before start."
-        }`
-      : "Quick check for Codex, Git, project access, and Linux sandbox readiness.";
+      ? readiness.overallStatus === "passed"
+        ? "All systems ready"
+        : readiness.overallStatus === "warning"
+          ? "Warnings to review"
+          : "Needs attention"
+      : "Check environment readiness.";
 
   return (
     <section className="controls rail-card">
-      <div className="section-heading">
+      <div className="section-heading compact-heading">
         <div>
-          <p className="section-kicker">Workspace</p>
-          <h2>Project</h2>
+          <p className="section-kicker">Project</p>
+          <h2>Workspace</h2>
         </div>
         <span className="section-chip">{status.active ? "Active" : "Ready"}</span>
       </div>
+      <article className="current-project-card">
+        <div className="current-project-icon" aria-hidden="true">
+          <span />
+        </div>
+        <div className="current-project-copy">
+          <strong>{projectTitle}</strong>
+          <span>{projectSubtitle}</span>
+          <span className={`project-health project-health-${readiness?.overallStatus ?? "passed"}`}>
+            {readiness?.overallStatus === "failed"
+              ? "Needs attention"
+              : readiness?.overallStatus === "warning"
+                ? "Review warnings"
+                : "Ready"}
+          </span>
+        </div>
+      </article>
       <label htmlFor="repo-path">Project folder path</label>
       <div className="repo-input-row">
         <input
@@ -314,47 +415,26 @@ export function ProjectControls({
           Choose folder
         </button>
       </div>
-      <p className="helper-text">
-        Paste one specific project path. Use the picker only when it can provide a usable folder path.
-      </p>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
-      <CollapsibleSection title="Environment readiness" subtitle={readinessSummary}>
-        <div className="readiness-card">
-          <div className="readiness-card-header">
-            <div>
-              <strong>Session preflight</strong>
-            </div>
-            <button type="button" className="ghost" onClick={onRefreshReadiness} disabled={!repoPath.trim() || isLoadingReadiness}>
-              {isLoadingReadiness ? "Checking..." : "Refresh"}
-            </button>
-          </div>
-          {!repoPath.trim() ? (
-            <p className="helper-text">Enter one project folder to run readiness checks.</p>
-          ) : isLoadingReadiness ? (
-            <p className="helper-text">Checking Codex, Git, project access, and Linux sandbox readiness...</p>
-          ) : readiness ? (
-            <>
-              <div className={`readiness-overall readiness-${readiness.overallStatus}`}>
-                <strong>{formatReadinessStatusLabel(readiness.overallStatus)}</strong>
-                <span>{readiness.canStart ? "This project can start a session." : "Fix the failed items below before starting a session."}</span>
-              </div>
-              <div className="readiness-list">
-                {readiness.items.map((item) => (
-                  <article key={item.key} className={`readiness-item readiness-${item.status}`}>
-                    <div className="readiness-item-header">
-                      <strong>{item.message}</strong>
-                      <span className="section-chip">{formatReadinessStatusLabel(item.status)}</span>
-                    </div>
-                    <p className="helper-text">{item.recommendedAction}</p>
-                  </article>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="helper-text">Could not run readiness checks yet. Refresh after choosing a project folder.</p>
-          )}
-        </div>
-      </CollapsibleSection>
+      <p className="helper-text subtle-helper">
+        Use one real project folder. Manual path entry stays fully supported.
+      </p>
+      <div className="project-launch-actions">
+        <button
+          type="button"
+          className="primary-action-button project-launch-button"
+          onClick={onChooseRepo}
+        >
+          Open project
+        </button>
+        <button
+          type="button"
+          className="ghost project-launch-button"
+          onClick={() => setIsCreateProjectExpanded(true)}
+        >
+          New project
+        </button>
+      </div>
       <div className="control-actions">
         <button
           type="button"
@@ -368,25 +448,16 @@ export function ProjectControls({
           Stop session
         </button>
       </div>
-      <div className="meta-row">
-        <div className="meta-pill">
-          <span className="meta-label">Server</span>
-          <strong>{connectionStateLabel}</strong>
-        </div>
-        <div className="meta-pill">
-          <span className="meta-label">Default repo root</span>
-          <strong>{isLoadingSettings ? "Loading..." : defaultRepoRoot || "Choose a folder"}</strong>
-        </div>
-      </div>
       <CollapsibleSection
         title="Recent projects"
         subtitle={
           isLoadingRecentProjects
             ? "Loading recent projects..."
             : recentProjects.length === 0
-              ? "Projects you open will appear here."
-              : `${recentProjects.length} recent project${recentProjects.length === 1 ? "" : "s"} available.`
+              ? "No previous projects yet."
+              : `${recentProjects.length} saved project${recentProjects.length === 1 ? "" : "s"}.`
         }
+        className="collapsible-section-secondary"
       >
         <div className="recent-projects">
           {recentProjects.length > 0 ? (
@@ -409,11 +480,59 @@ export function ProjectControls({
           ) : null}
         </div>
       </CollapsibleSection>
+      <CollapsibleSection
+        title="Environment readiness"
+        subtitle={readinessSummary}
+        defaultExpanded={readinessHasWarningsOrFailures}
+        className={readiness?.overallStatus === "passed" ? "collapsible-section-quiet readiness-collapsible" : "readiness-collapsible"}
+      >
+        <div className="readiness-card">
+          <div className="readiness-card-header">
+            <div>
+              <strong>Session preflight</strong>
+              <p className="helper-text collapsible-section-subtitle">
+                {isLoadingSettings ? "Loading default project root..." : defaultRepoRoot || "Choose a folder"}
+              </p>
+            </div>
+            <button type="button" className="ghost" onClick={onRefreshReadiness} disabled={!repoPath.trim() || isLoadingReadiness}>
+              {isLoadingReadiness ? "Checking..." : "Refresh"}
+            </button>
+          </div>
+          {!repoPath.trim() ? (
+            <p className="helper-text">Choose a project folder to run readiness checks.</p>
+          ) : isLoadingReadiness ? (
+            <p className="helper-text">Checking Codex, Git, access, and sandbox readiness...</p>
+          ) : readiness ? (
+            <>
+              <div className={`readiness-overall readiness-${readiness.overallStatus}`}>
+                <strong>{formatReadinessStatusLabel(readiness.overallStatus)}</strong>
+                <span>{readiness.canStart ? "Ready to start." : "Fix the failed items before starting."}</span>
+              </div>
+              <div className="readiness-list">
+                {readiness.items.map((item) => (
+                  <article key={item.key} className={`readiness-item readiness-${item.status}`}>
+                    <div className="readiness-item-header">
+                      <strong>{item.message}</strong>
+                      <span className="section-chip">{formatReadinessStatusLabel(item.status)}</span>
+                    </div>
+                    <p className="helper-text">{item.recommendedAction}</p>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="helper-text">Could not run readiness checks yet. Refresh after choosing a project folder.</p>
+          )}
+          <p className="helper-text readiness-footnote">Server: {connectionStateLabel}</p>
+        </div>
+      </CollapsibleSection>
       <div className="project-secondary-sections">
-        <p className="section-divider-label">Or create a new project</p>
+        <p className="section-divider-label">New project</p>
         <CollapsibleSection
           title="Create new project"
-          subtitle="Use the path above only when you want the app to create a brand-new folder."
+          subtitle="Use this only when you want the app to create a brand-new folder."
+          className="collapsible-section-secondary"
+          defaultExpanded={isCreateProjectExpanded}
         >
           <div className="project-create-card">
             <label className="checkbox-row">
@@ -471,6 +590,37 @@ export function ProjectControls({
   );
 }
 
+function WorkflowStepper({ workflowPhase }: { workflowPhase: ConsoleViewProps["workflowPhase"] }) {
+  const steps: Array<{ key: ConsoleViewProps["workflowPhase"]; label: string; detail: string }> = [
+    { key: "project", label: "Project", detail: "Select workspace" },
+    { key: "compose", label: "Compose", detail: "Write your prompt" },
+    { key: "live-run", label: "Live Run", detail: "Codex is working" },
+    { key: "results", label: "Results", detail: "Review output" }
+  ];
+
+  const activeIndex = steps.findIndex((step) => step.key === workflowPhase);
+
+  return (
+    <section className="workflow-stepper workspace-card" aria-label="Workflow progress">
+      {steps.map((step, index) => {
+        const isComplete = index < activeIndex;
+        const isActive = index === activeIndex;
+
+        return (
+          <div key={step.key} className={`workflow-step ${isActive ? "active" : ""} ${isComplete ? "complete" : ""}`}>
+            <span className="workflow-step-index">{index + 1}</span>
+            <div className="workflow-step-copy">
+              <strong>{step.label}</strong>
+              <span>{step.detail}</span>
+            </div>
+            {index < steps.length - 1 ? <span className="workflow-step-arrow" aria-hidden="true">›</span> : null}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 export function PendingContextPanel({
   pendingContextItems,
   readyPendingItemCount,
@@ -501,10 +651,7 @@ export function PendingContextPanel({
             : pendingContextEmptyState}
       </p>
       {pendingContextItems.length === 0 ? (
-        <p className="empty-context">
-          Nothing is queued yet. Large pasted text becomes a local markdown file reference, and attachments stay local
-          inside the active repo.
-        </p>
+        <p className="empty-context">Add context only when this task needs it.</p>
       ) : (
         <div className="attachment-groups">
           {groupedItems.map((group) => (
@@ -634,8 +781,6 @@ export function ComposerPanel({
   onSendPrompt,
   contextMessage
 }: ComposerPanelProps) {
-  const terminalGuidance = buildTerminalGuidance(sessionBanner);
-
   return (
     <section
       className="prompt-panel workspace-card composer-card"
@@ -648,14 +793,13 @@ export function ComposerPanel({
         <div>
           <p className="section-kicker">Prompt</p>
           <h2>Guide Codex intentionally</h2>
-          <p className="helper-text">Write the task, add context if needed, and send it when you are ready.</p>
-          {terminalGuidance ? <p className="helper-text composer-guidance">{terminalGuidance}</p> : null}
+          <p className="helper-text">Describe the task, then send it.</p>
         </div>
         <div className="attachment-actions">
           <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={!status.active}>
             Attach files
           </button>
-          <span className="helper-text">Drop files here or paste an image into the prompt box.</span>
+          <span className="helper-text">Drop files or paste an image.</span>
         </div>
       </div>
       <input
@@ -688,9 +832,7 @@ export function ComposerPanel({
         <div className="prompt-preview-header">
           <div>
             <strong>What Codex will receive</strong>
-            {isPromptPreviewExpanded ? (
-              <p className="helper-text">This is the exact prompt that will be sent, including saved context references.</p>
-            ) : null}
+            {!isPromptPreviewExpanded ? <p className="helper-text">Review only when needed.</p> : null}
           </div>
           <div className="prompt-preview-actions">
             <button type="button" className="ghost" onClick={onTogglePromptPreview}>
@@ -721,7 +863,7 @@ export function ComposerPanel({
             ) : (
               <div className="prompt-preview-empty-state">
                 <strong>Nothing queued yet</strong>
-                <p>Add a typed prompt, pasted document, file, image, or ZIP to see the exact message before sending it.</p>
+                <p>Add a prompt or context to preview the final message.</p>
               </div>
             )}
             <article className="prompt-preview-section prompt-preview-full">
@@ -735,9 +877,7 @@ export function ComposerPanel({
         <button type="button" onClick={onSendPrompt} disabled={!status.active}>
           Send prompt
         </button>
-        <span className="helper-text">
-          Short pasted text stays inline. Large pasted text becomes a local context file.
-        </span>
+        <span className="helper-text subtle-helper">Large pasted text becomes a saved context file.</span>
       </div>
       {contextMessage ? <p className="success-banner">{contextMessage}</p> : null}
     </section>
@@ -758,12 +898,11 @@ export function RepoInsightsPanel({
 
   return (
     <section className="git-section utility-surface">
-      <div className="section-heading">
+      <div className="section-heading utility-section-heading">
         <div>
-          <p className="section-kicker">Repository</p>
           <h2>Changes</h2>
         </div>
-        <span className="section-chip">{status.active ? "Live" : "Idle"}</span>
+        {status.active ? <span className="section-chip">Live</span> : null}
       </div>
       {status.active ? (
         <div className="git-actions">
@@ -772,7 +911,7 @@ export function RepoInsightsPanel({
           </button>
         </div>
       ) : null}
-      {!status.active ? <p className="git-empty">Start a session to inspect repo changes.</p> : null}
+      {!status.active ? <p className="git-empty">No changes yet. Start a session to inspect the project.</p> : null}
       {status.active ? (
         <CollapsibleSection
           title="Repo details"
@@ -786,6 +925,9 @@ export function RepoInsightsPanel({
           defaultExpanded={hasDiffState}
         >
           <>
+            {!isLoadingGitStatus && !hasDiffState && gitStatus?.isGitRepo ? (
+              <p className="git-empty">No change review is open yet. Inspect changes when you want to review edits.</p>
+            ) : null}
             {isLoadingGitStatus ? <p className="git-empty">Loading repo status...</p> : null}
             {!isLoadingGitStatus && gitStatus ? (
               gitStatus.isGitRepo ? (
@@ -848,16 +990,15 @@ export function SessionHistoryPanel({
 }: SessionHistoryPanelProps) {
   return (
     <section className="history-section utility-surface">
-      <div className="section-heading">
+      <div className="section-heading utility-section-heading">
         <div>
-          <p className="section-kicker">History</p>
           <h2>Session history</h2>
         </div>
         <span className="section-chip">{sessions.length}</span>
       </div>
       <div className="history-list">
         {isLoadingSessions ? <p className="history-empty">Loading recent sessions...</p> : null}
-        {!isLoadingSessions && sessions.length === 0 ? <p className="history-empty">No saved sessions yet.</p> : null}
+        {!isLoadingSessions && sessions.length === 0 ? <p className="history-empty">No previous sessions yet.</p> : null}
         {sessions.map((session) => (
           <article className="history-item" key={session.id}>
             <p className="history-repo">{session.repoPath}</p>
@@ -933,7 +1074,7 @@ export function SessionHistoryPanel({
       ) : showTranscriptViewer ? (
         <div className="transcript-empty-state">
           <strong>No transcript yet</strong>
-          <p>Open a recent session to review its transcript here.</p>
+          <p>Finish a session to review output.</p>
         </div>
       ) : null}
     </section>
@@ -975,6 +1116,20 @@ function ResultsSummaryCard({
           repoInsightsPanel.gitStatus.stagedFilesCount > 0 ||
           repoInsightsPanel.gitStatus.untrackedFilesCount > 0))
   );
+  const primaryActionLabel =
+    sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "Review what happened" : "Review transcript";
+  const secondaryActionLabel =
+    sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "Prepare next prompt" : "Write next prompt";
+
+  const focusPromptInput = () => {
+    const promptInput = document.getElementById("prompt-input");
+    if (!(promptInput instanceof HTMLTextAreaElement)) {
+      return;
+    }
+
+    promptInput.focus();
+    promptInput.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
 
   return (
     <section className="results-summary-card workspace-card">
@@ -1015,16 +1170,17 @@ function ResultsSummaryCard({
         </span>
       </div>
       <div className="results-summary-actions">
-        <button type="button" className="secondary" onClick={onOpenTranscript} disabled={!transcriptAvailable}>
-          Open transcript
+        <button type="button" onClick={onOpenTranscript} disabled={!transcriptAvailable}>
+          {primaryActionLabel}
+        </button>
+        <button type="button" className="secondary" onClick={focusPromptInput}>
+          {secondaryActionLabel}
         </button>
         <button type="button" className="ghost" onClick={onOpenChanges}>
-          Inspect changes
+          {changesAvailable ? "Review changes" : "Check changes"}
         </button>
       </div>
-      <p className="helper-text results-next-step">
-        <strong>Next step:</strong> {getSuggestedNextAction(sessionBanner)}
-      </p>
+      <p className="helper-text results-next-step">{getSuggestedNextAction(sessionBanner)}</p>
     </section>
   );
 }
@@ -1057,12 +1213,6 @@ function UtilityPanel({
 
   return (
     <section className="utility-panel rail-card">
-      <div className="section-heading utility-panel-heading">
-        <div>
-          <p className="section-kicker">Utilities</p>
-          <h2>{formatUtilityModeLabel(utilityMode)}</h2>
-        </div>
-      </div>
       <div className="utility-mode-tabs" role="tablist" aria-label="Utility panels">
         {utilityTabButtons}
       </div>
@@ -1072,6 +1222,44 @@ function UtilityPanel({
         {utilityMode === "history" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer={false} /> : null}
         {utilityMode === "transcript" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer /> : null}
       </div>
+    </section>
+  );
+}
+
+function ApprovalActionStrip({
+  sessionBanner
+}: {
+  sessionBanner: ConsoleViewProps["sessionBanner"];
+}) {
+  if (sessionBanner.state !== "awaiting-approval" && sessionBanner.state !== "awaiting-input") {
+    return null;
+  }
+
+  const isApproval = sessionBanner.state === "awaiting-approval";
+
+  return (
+    <section className={`approval-action-strip ${isApproval ? "approval-pending" : "awaiting-input-strip"}`}>
+      <div className="approval-action-copy">
+        <strong>{isApproval ? "Codex is waiting for approval" : "Codex is waiting for your next instruction"}</strong>
+        <p>
+          {isApproval
+            ? "Approve in the terminal to keep the task moving. After approval, work will continue automatically."
+            : "Use the prompt box or the terminal to continue the session."}
+        </p>
+      </div>
+      <button
+        type="button"
+        className={isApproval ? undefined : "secondary"}
+        onClick={() => {
+          const promptInput = document.getElementById("prompt-input");
+          if (promptInput instanceof HTMLTextAreaElement) {
+            promptInput.focus();
+            promptInput.scrollIntoView({ block: "center", behavior: "smooth" });
+          }
+        }}
+      >
+        {isApproval ? "Review terminal" : "Write next prompt"}
+      </button>
     </section>
   );
 }
@@ -1093,6 +1281,11 @@ export function ConsoleView({
 }: ConsoleViewProps) {
   const terminalGuidance = buildTerminalGuidance(sessionBanner);
   const showResultsSummary = workflowPhase === "results";
+  const showTerminalGuidance =
+    sessionBanner.state === "awaiting-approval" ||
+    sessionBanner.state === "awaiting-input" ||
+    sessionBanner.state === "disconnected" ||
+    sessionBanner.state === "failed";
 
   return (
     <div className={`console-layout workflow-${workflowPhase}`}>
@@ -1101,7 +1294,51 @@ export function ConsoleView({
       </aside>
 
       <main className="workspace-main">
+        <WorkflowStepper workflowPhase={workflowPhase} />
         <ComposerPanel {...composerPanel} />
+
+        <section className="terminal-section workspace-card">
+          <div
+            className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
+              sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
+            }`}
+            data-session-state={sessionBanner.state}
+          >
+            <div className="terminal-stage-header">
+              <div>
+                <p className="section-kicker">Live run</p>
+                <h2>Live Codex terminal</h2>
+                <p className="terminal-subcopy">
+                  {status.active
+                    ? sessionBanner.state === "awaiting-approval"
+                      ? "Codex paused for approval."
+                      : "Codex is running your task."
+                    : "Start a session to open the terminal workspace."}
+                </p>
+              </div>
+              <div className="terminal-stage-meta">
+                {sessionBanner.state === "awaiting-approval" || sessionBanner.state === "awaiting-input" ? (
+                  <span className="section-chip">{formatSessionBannerStateLabel(sessionBanner.state)}</span>
+                ) : null}
+                <div className="terminal-toolbar">
+                  <button
+                    type="button"
+                    className="ghost terminal-tool-button"
+                    onClick={() => {
+                      const terminal = terminalContainerRef.current;
+                      terminal?.scrollIntoView({ block: "center", behavior: "smooth" });
+                    }}
+                  >
+                    Focus
+                  </button>
+                </div>
+              </div>
+            </div>
+            {showTerminalGuidance && terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
+            <div ref={terminalContainerRef} className="terminal-panel" />
+          </div>
+        </section>
+        <ApprovalActionStrip sessionBanner={sessionBanner} />
         {showResultsSummary ? (
           <ResultsSummaryCard
             sessionBanner={sessionBanner}
@@ -1113,28 +1350,6 @@ export function ConsoleView({
             formatDuration={sessionHistoryPanel.formatDuration}
           />
         ) : null}
-
-        <section className="terminal-section workspace-card">
-          <div
-            className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
-              sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
-            }`}
-            data-session-state={sessionBanner.state}
-          >
-            <div className="terminal-stage-header">
-              <div>
-                <p className="section-kicker">Console</p>
-                <h2>Live Codex terminal</h2>
-              </div>
-              <div className="terminal-stage-meta">
-                <span className="section-chip">{status.active ? formatSessionBannerStateLabel(sessionBanner.state) : "Waiting"}</span>
-                <span className="section-chip workflow-phase-chip">{formatWorkflowPhaseLabel(workflowPhase)}</span>
-              </div>
-            </div>
-            {terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
-            <div ref={terminalContainerRef} className="terminal-panel" />
-          </div>
-        </section>
       </main>
 
       <aside className="insights-rail utility-rail">

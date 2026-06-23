@@ -209,4 +209,7 @@ export type ConsoleHeaderProps = {
   onChangeView(nextView: "console" | "settings"): void;
   sessionBanner: SessionBanner;
   sessionActivity: SessionActivitySummary;
+  onDisconnect(): void;
+  connectionStateLabel: string;
+  hasActiveSession: boolean;
 };
