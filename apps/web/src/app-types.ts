@@ -161,7 +161,6 @@ export type ComposerPanelProps = {
   onTogglePromptPreview(): void;
   onCopyPromptPreview(): void;
   onSendPrompt(): void;
-  contextMessage: string;
 };
 
 export type RepoInsightsPanelProps = {
@@ -195,7 +194,9 @@ export type ConsoleViewProps = {
   repoInsightsPanel: RepoInsightsPanelProps;
   sessionHistoryPanel: SessionHistoryPanelProps;
   workflowPhase: WorkflowPhase;
+  workspaceView: WorkflowPhase;
   utilityMode: UtilityMode;
+  onSelectWorkspaceView(nextView: WorkflowPhase): void;
   onUtilityModeChange(nextMode: UtilityMode): void;
   status: SessionStatus;
   sessionBanner: SessionBanner;

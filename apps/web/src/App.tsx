@@ -177,6 +177,7 @@ export function App() {
   });
   const [readiness, setReadiness] = useState<ReadinessSummary | null>(null);
   const [utilityMode, setUtilityMode] = useState<UtilityMode>("history");
+  const [workspaceView, setWorkspaceView] = useState<"project" | "compose" | "live-run" | "results">("project");
 
   const readyPendingItemCount = countReadyPendingContextItems(pendingContextItems);
   const pendingContextPreviewLines = buildPendingContextPreview(pendingContextItems);
@@ -208,6 +209,9 @@ export function App() {
     setRepoPath(nextPath);
     setProjectMessage("");
     setRepoPickerMessage("");
+    if (!nextPath.trim()) {
+      setWorkspaceView("project");
+    }
   };
 
   const setCopyFeedback = (subject: string, result: Awaited<ReturnType<typeof copyRelativePath>>) => {
@@ -270,6 +274,17 @@ export function App() {
   useEffect(() => {
     setUtilityMode(recommendedUtilityMode);
   }, [recommendedUtilityMode]);
+
+  useEffect(() => {
+    if (workflowPhase === "live-run" || workflowPhase === "results") {
+      setWorkspaceView(workflowPhase);
+      return;
+    }
+
+    if (!repoPath.trim()) {
+      setWorkspaceView("project");
+    }
+  }, [repoPath, workflowPhase]);
 
   useEffect(() => {
     const terminal = new Terminal({
@@ -487,6 +502,7 @@ export function App() {
       if (message.type === "status") {
         setStatus(message.payload);
         if (message.payload.active) {
+          setWorkspaceView("live-run");
           setSessionActivity((current) => ({
             startedAt: message.payload.startedAt ?? current.startedAt,
             lastActivityAt: current.lastActivityAt ?? message.payload.startedAt ?? new Date().toISOString(),
@@ -660,6 +676,7 @@ export function App() {
       failedAt: null
     });
     setSessionBanner((current) => reduceSessionBanner(current, { type: "start-requested", repoPath }));
+    setWorkspaceView("live-run");
     terminalRef.current?.clear();
     socketRef.current?.send(
       JSON.stringify({
@@ -1050,6 +1067,7 @@ export function App() {
     }));
     socketRef.current?.send(JSON.stringify({ type: "input", data: buildSubmittedPromptInput(composedPrompt) }));
     setSessionBanner((current) => reduceSessionBanner(current, { type: "prompt-submitted" }));
+    setWorkspaceView("live-run");
     terminalRef.current?.writeln(`\n[web prompt sent]\n${composedPrompt}\n`);
     setPromptText("");
     setPendingContextItems([]);
@@ -1266,8 +1284,7 @@ export function App() {
             onCopyPromptPreview: () => {
               void copyPromptPreview();
             },
-            onSendPrompt: sendPrompt,
-            contextMessage
+            onSendPrompt: sendPrompt
           }}
           repoInsightsPanel={{
             status,
@@ -1301,7 +1318,9 @@ export function App() {
             formatDuration
           }}
           workflowPhase={workflowPhase}
+          workspaceView={workspaceView}
           utilityMode={utilityMode}
+          onSelectWorkspaceView={setWorkspaceView}
           onUtilityModeChange={setUtilityMode}
           status={status}
           sessionBanner={sessionBanner}
@@ -1382,6 +1401,7 @@ export function App() {
         </section>
       )}
 
+      {contextMessage ? <p className="success-banner compact-success">{contextMessage}</p> : null}
       {error ? <p className="error-banner">{error}</p> : null}
     </div>
   );

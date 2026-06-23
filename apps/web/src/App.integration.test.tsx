@@ -341,6 +341,26 @@ describe("App integration", () => {
     expect((screen.getByLabelText("Project folder path") as HTMLInputElement).value).toBe("/workspace/new-project");
   });
 
+  it("uses the left rail to switch the center workspace between project and compose", async () => {
+    const socket = renderApp();
+
+    expect(await screen.findByText("Choose a project")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Project folder path"), {
+      target: {
+        value: "/workspace/default-project"
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Compose view" }));
+    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
+    expect(screen.queryByText("Choose a project")).toBeNull();
+
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Project view" }));
+    expect(await screen.findByText("Choose a project")).toBeTruthy();
+  });
+
   it("walks the session banner through idle, starting, running, stopping, and stopped states", async () => {
     const socket = renderApp();
 
@@ -440,6 +460,9 @@ describe("App integration", () => {
   it("shows the generated prompt preview when expanded", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Compose view" }));
+    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Prompt"), {
       target: {
@@ -457,6 +480,9 @@ describe("App integration", () => {
   it("submits the prompt in one send action and shows waiting banner updates", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Compose view" }));
+    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Prompt"), {
       target: {
@@ -944,5 +970,7 @@ describe("App integration", () => {
 
     expect((await screen.findAllByText("Results")).length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText("Review transcript")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Write next prompt" }));
+    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
   });
 });

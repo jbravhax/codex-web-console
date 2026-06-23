@@ -2006,8 +2006,124 @@ body {
   color: #b91c1c;
 }
 
+.project-rail {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.project-rail-header {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.project-rail-header strong {
+  font-size: 1.02rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.project-rail-header span {
+  color: var(--muted);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.project-nav {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.project-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  width: 100%;
+  min-height: 54px;
+  padding: 0.8rem 0.9rem;
+  border-radius: 18px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.project-nav-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.project-nav-item.selected {
+  background: rgba(255, 255, 255, 0.44);
+  border-color: rgba(148, 163, 184, 0.14);
+}
+
+.project-nav-item.current-phase:not(.selected) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.project-nav-copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.project-nav-copy strong,
+.project-nav-copy span {
+  display: block;
+}
+
+.project-nav-copy strong {
+  color: var(--text);
+  font-size: 0.96rem;
+  font-weight: 600;
+}
+
+.project-nav-copy span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.project-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.project-rail-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.1rem;
+}
+
+.project-rail-connection {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
 .controls label {
   margin-bottom: 0.5rem;
+}
+
+.project-workspace-card {
+  padding: 1.15rem;
+}
+
+.project-workspace-summary {
+  margin-top: 0;
+  margin-bottom: 0.8rem;
+  max-width: 40rem;
 }
 
 .repo-input-row {
@@ -2074,6 +2190,15 @@ body {
   gap: 0.8rem;
   align-items: center;
   padding: 1rem 1.1rem;
+}
+
+.workspace-view-project .workflow-stepper,
+.workspace-view-results .workflow-stepper {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding-left: 0.2rem;
+  padding-right: 0.2rem;
 }
 
 .workflow-step {
@@ -2145,6 +2270,13 @@ body {
 
 .composer-card {
   padding: 1.05rem 1.15rem 1rem;
+}
+
+.workspace-followup .composer-card {
+  padding-top: 0.95rem;
+  background: rgba(255, 255, 255, 0.34);
+  border-color: rgba(148, 163, 184, 0.08);
+  box-shadow: none;
 }
 
 .composer-header {
@@ -2527,6 +2659,30 @@ body {
 
 .workflow-live-run .results-summary-card {
   display: none;
+}
+
+.workspace-view-project .utility-rail,
+.workspace-view-project .workflow-stepper {
+  opacity: 0.92;
+}
+
+.workspace-view-project .utility-panel,
+.workspace-view-results .utility-panel {
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.workspace-view-project .project-rail,
+.workspace-view-results .project-rail {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.workspace-view-live-run .project-rail,
+.workspace-view-live-run .utility-panel {
+  opacity: 0.9;
+}
+
+.workspace-view-live-run .workspace-followup {
+  margin-top: -0.05rem;
 }
 
 @media (max-width: 1280px) {
