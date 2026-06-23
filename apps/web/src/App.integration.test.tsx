@@ -252,9 +252,16 @@ function createDeferredPromise<T>() {
 }
 
 function getInspectorLauncherButton(name: "Context" | "History" | "Transcript" | "Changes") {
-  return screen
-    .getAllByRole("button", { name })
-    .find((button) => button.getAttribute("role") !== "tab");
+  const launcher = document.querySelector(".inspector-launcher");
+  if (!launcher) {
+    return undefined;
+  }
+
+  if (!(launcher instanceof HTMLElement)) {
+    return undefined;
+  }
+
+  return within(launcher).getByRole("button", { name });
 }
 
 async function openInspectorMode(name: "Context" | "History" | "Transcript" | "Changes") {
@@ -360,7 +367,7 @@ describe("App integration", () => {
     expect((screen.getByLabelText("Project folder path") as HTMLInputElement).value).toBe("/workspace/new-project");
   });
 
-  it("uses the left rail to switch the center workspace between project and compose", async () => {
+  it("uses the left rail to switch between project and the unified workspace", async () => {
     const socket = renderApp();
 
     expect(await screen.findByText("Choose a project")).toBeTruthy();
@@ -370,9 +377,14 @@ describe("App integration", () => {
       }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Compose view" }));
+    expect(screen.queryByRole("button", { name: "Compose view" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Live run view" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Results view" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Workspace view" }));
     expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
     expect(screen.queryByText("Choose a project")).toBeNull();
+    expect(await screen.findByText("Workspace status")).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
     expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
@@ -480,7 +492,7 @@ describe("App integration", () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
     expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Compose view" }));
+    fireEvent.click(screen.getByRole("button", { name: "Workspace view" }));
     expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Prompt"), {
@@ -500,7 +512,7 @@ describe("App integration", () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
     expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Compose view" }));
+    fireEvent.click(screen.getByRole("button", { name: "Workspace view" }));
     expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Prompt"), {
@@ -972,6 +984,102 @@ describe("App integration", () => {
     });
 
     expect(diffPanel.textContent).toContain("=== Unstaged changes ===");
+  });
+
+  it("keeps the inspector closed by default during compose and active live-run states", async () => {
+    const socket = renderApp();
+
+    fireEvent.change(screen.getByLabelText("Project folder path"), {
+      target: {
+        value: "/workspace/default-project"
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Workspace view" }));
+
+    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
+    expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
+
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
+    expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
+
+    socket.emitMessage({
+      type: "output",
+      payload: "Would you like to run the following command?\nPress enter to confirm"
+    });
+
+    expect((await screen.findAllByText("Waiting for approval")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
+  });
+
+  it("lets the user open and close inspector modes without leaving the workspace", async () => {
+    const socket = renderApp();
+
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
+
+    await openInspectorMode("Context");
+    expect(screen.getByRole("tab", { name: "Context" }).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Transcript" }));
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Transcript" }).getAttribute("aria-selected")).toBe("true");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "History" }).getAttribute("aria-selected")).toBe("true");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Changes" }));
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
+    });
+    expect(screen.getByText("Live Codex terminal")).toBeTruthy();
+  });
+
+  it("opens review affordances after completion and closes the inspector when returning to project setup", async () => {
+    const socket = renderApp({
+      sessions: {
+        items: [
+          {
+            id: "session-1",
+            repoPath: "/workspace/default-project",
+            startTime: "2026-06-22T21:10:00.000Z",
+            endTime: "2026-06-22T21:12:00.000Z",
+            durationMs: 120000
+          }
+        ]
+      }
+    });
+
+    emitSessionStatus(socket, true, "/workspace/default-project");
+    socket.emitMessage({
+      type: "output",
+      payload: "Created only README.md.\n\nDone."
+    });
+    socket.emitMessage({
+      type: "exit",
+      payload: {
+        exitCode: 0,
+        signal: 0,
+        startedAt: "2026-06-22T21:10:00.000Z",
+        endedAt: "2026-06-22T21:12:00.000Z",
+        failure: null
+      }
+    });
+
+    expect((await screen.findAllByText("Results")).length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByRole("tablist", { name: "Utility panels" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Project view" }));
+    expect(await screen.findByText("Choose a project")).toBeTruthy();
+    expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
   });
 
   it("uses utility tabs for progressive disclosure and shows a results summary after completion", async () => {

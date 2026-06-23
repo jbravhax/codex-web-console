@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { createPastedImageFileName, isSupportedAttachmentName } from "./attachments";
@@ -283,11 +283,13 @@ export function App() {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
 
-  useEffect(() => {
-    setUtilityMode(recommendedUtilityMode);
-  }, [recommendedUtilityMode]);
+  useLayoutEffect(() => {
+    if (!inspectorOpen) {
+      setUtilityMode(recommendedUtilityMode);
+    }
+  }, [inspectorOpen, recommendedUtilityMode]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previousWorkspaceState = previousWorkspaceStateRef.current;
 
     if (workspaceState !== previousWorkspaceState) {
@@ -318,6 +320,12 @@ export function App() {
       setSurface("project");
     }
   }, [repoPath]);
+
+  useEffect(() => {
+    if (surface === "project") {
+      setInspectorOpen(false);
+    }
+  }, [surface]);
 
   useEffect(() => {
     const terminalParent = terminalContainerRef.current;

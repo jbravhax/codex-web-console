@@ -130,6 +130,52 @@ function formatUtilityModeLabel(mode: ConsoleViewProps["utilityMode"]): string {
   }
 }
 
+function formatWorkspaceStateLabel(workspaceState: ConsoleViewProps["workspaceState"]): string {
+  switch (workspaceState) {
+    case "idle":
+      return "Ready";
+    case "ready-to-compose":
+      return "Ready";
+    case "running":
+      return "Running";
+    case "awaiting-approval":
+      return "Waiting";
+    case "awaiting-input":
+      return "Waiting";
+    case "completed":
+      return "Completed";
+    case "stopped":
+      return "Stopped";
+    case "failed":
+      return "Needs attention";
+    case "disconnected":
+      return "Disconnected";
+  }
+}
+
+function formatWorkspaceStateDetail(workspaceState: ConsoleViewProps["workspaceState"]): string {
+  switch (workspaceState) {
+    case "idle":
+      return "Open a project and start when ready.";
+    case "ready-to-compose":
+      return "Write the task and queue any context.";
+    case "running":
+      return "Codex is working in the terminal.";
+    case "awaiting-approval":
+      return "Approval is needed in the terminal.";
+    case "awaiting-input":
+      return "Codex is waiting for your next instruction.";
+    case "completed":
+      return "Review the output and continue when ready.";
+    case "stopped":
+      return "The session stopped before completion.";
+    case "failed":
+      return "Review what happened and try again.";
+    case "disconnected":
+      return "Reconnect and start a fresh session.";
+  }
+}
+
 type VisualWorkspaceView = "project" | WorkspaceSection;
 
 function mapWorkspaceStateToVisualView(
@@ -374,6 +420,7 @@ function ProjectRail({
   projectTitle,
   projectSubtitle,
   readiness,
+  hasProjectPath,
   recentProjectCount,
   readyPendingItemCount,
   hasResults,
@@ -389,6 +436,7 @@ function ProjectRail({
   projectTitle: string;
   projectSubtitle: string;
   readiness: ProjectControlsProps["readiness"];
+  hasProjectPath: boolean;
   recentProjectCount: number;
   readyPendingItemCount: number;
   hasResults: boolean;
@@ -398,7 +446,7 @@ function ProjectRail({
 }) {
   const activeVisualView = mapWorkspaceStateToVisualView(surface, workspaceState);
   const navItems: Array<{
-    view: VisualWorkspaceView;
+    view: ConsoleViewProps["surface"];
     label: string;
     detail: string;
     disabled?: boolean;
@@ -407,26 +455,15 @@ function ProjectRail({
     {
       view: "project",
       label: "Project",
-      detail: "Choose or create a workspace",
+      detail: "Choose or update the current project",
       badge: recentProjectCount > 0 ? `${recentProjectCount}` : null
     },
     {
-      view: "compose",
-      label: "Compose",
-      detail: hasActiveSession ? "Write the next prompt" : "Prepare the task",
-      badge: readyPendingItemCount > 0 ? `${readyPendingItemCount}` : null
-    },
-    {
-      view: "live-run",
-      label: "Live run",
-      detail: hasActiveSession ? "Watch Codex work" : "Available during a session",
-      disabled: !hasActiveSession
-    },
-    {
-      view: "results",
-      label: "Results",
-      detail: hasResults ? "Review output" : "Available after a run",
-      disabled: !hasResults
+      view: "workspace",
+      label: "Workspace",
+      detail: hasActiveSession ? "Compose, run, and review in one place" : "Open the unified working canvas",
+      badge: readyPendingItemCount > 0 ? `${readyPendingItemCount}` : null,
+      disabled: !hasProjectPath
     }
   ];
 
@@ -445,24 +482,20 @@ function ProjectRail({
         <span>{projectSubtitle}</span>
       </div>
 
-      <nav className="project-nav" aria-label="Workspace views">
+      <nav className="project-nav" aria-label="Primary navigation">
         {navItems.map((item) => {
-          const isSelected = item.view === "project" ? surface === "project" : surface === "workspace" && workspaceSection === item.view;
-          const isCurrentPhase = activeVisualView === item.view;
+          const isSelected = surface === item.view;
+          const isCurrentPhase =
+            item.view === "project" ? activeVisualView === "project" : activeVisualView !== "project";
 
           return (
             <button
               key={item.view}
               type="button"
-              aria-label={`${item.label} view`}
+              aria-label={item.label === "Project" ? "Project view" : "Workspace view"}
               className={`project-nav-item ${isSelected ? "selected" : ""} ${isCurrentPhase ? "current-phase" : ""}`.trim()}
               onClick={() => {
-                if (item.view === "project") {
-                  onSelectSurface("project");
-                  return;
-                }
-
-                onSelectWorkspaceSection(item.view);
+                onSelectSurface(item.view);
               }}
               disabled={item.disabled}
             >
@@ -475,6 +508,21 @@ function ProjectRail({
           );
         })}
       </nav>
+
+      <div className="workspace-status-card" aria-label="Workspace status">
+        <div className="workspace-status-header">
+          <strong>Workspace status</strong>
+          <span className={`section-chip workspace-status-chip workspace-status-${workspaceState}`}>
+            {formatWorkspaceStateLabel(workspaceState)}
+          </span>
+        </div>
+        <p>{formatWorkspaceStateDetail(workspaceState)}</p>
+        <div className="workspace-status-meta">
+          <span className="project-rail-connection">{connectionStateLabel}</span>
+          {hasResults ? <span className="workspace-status-meta-item">Results available</span> : null}
+          {hasActiveSession ? <span className="workspace-status-meta-item">Session active</span> : null}
+        </div>
+      </div>
 
       <div className="project-rail-status">
         <span className={`project-health project-health-${readiness?.overallStatus ?? "passed"}`}>{readinessLabel}</span>
@@ -724,15 +772,19 @@ export function ProjectControls({
   );
 }
 
-function WorkflowStepper({ activeView }: { activeView: VisualWorkspaceView }) {
-  const steps: Array<{ key: VisualWorkspaceView; label: string; detail: string }> = [
-    { key: "project", label: "Project", detail: "Select workspace" },
-    { key: "compose", label: "Compose", detail: "Write your prompt" },
-    { key: "live-run", label: "Live Run", detail: "Codex is working" },
-    { key: "results", label: "Results", detail: "Review output" }
+function WorkflowStepper({
+  surface,
+  workspaceState
+}: {
+  surface: ConsoleViewProps["surface"];
+  workspaceState: ConsoleViewProps["workspaceState"];
+}) {
+  const steps: Array<{ key: ConsoleViewProps["surface"]; label: string; detail: string }> = [
+    { key: "project", label: "Project", detail: "Choose a working folder" },
+    { key: "workspace", label: "Workspace", detail: formatWorkspaceStateDetail(workspaceState) }
   ];
 
-  const activeIndex = steps.findIndex((step) => step.key === activeView);
+  const activeIndex = steps.findIndex((step) => step.key === surface);
 
   return (
     <section className="workflow-stepper" aria-label="Workflow progress">
@@ -1478,6 +1530,7 @@ export function ConsoleView({
           projectTitle={projectTitle}
           projectSubtitle={projectSubtitle}
           readiness={projectControls.readiness}
+          hasProjectPath={projectControls.repoPath.trim().length > 0}
           recentProjectCount={projectControls.recentProjects.length}
           readyPendingItemCount={pendingContextPanel.readyPendingItemCount}
           hasResults={hasResults}
@@ -1489,7 +1542,7 @@ export function ConsoleView({
 
       <main className="workspace-main">
         <section className="workspace-topbar workspace-card">
-          <WorkflowStepper activeView={showProjectWorkspace ? "project" : workspaceSection} />
+          <WorkflowStepper surface={surface} workspaceState={workspaceState} />
           <InspectorLauncher
             utilityMode={utilityMode}
             inspectorOpen={inspectorOpen}
