@@ -75,7 +75,16 @@ import {
 } from "./session-diagnostics";
 import { friendlyUploadErrorMessage } from "./ui-messages";
 import { loadReadiness } from "./readiness";
-import { deriveWorkflowPhase, recommendUtilityMode, type UtilityMode } from "./workflow-phase";
+import {
+  deriveWorkspaceState,
+  isLiveRunWorkspaceState,
+  isResultsWorkspaceState,
+  recommendUtilityMode,
+  type AppSurface,
+  type UtilityMode,
+  type WorkspaceSection,
+  type WorkspaceState
+} from "./workflow-phase";
 
 const DEFAULT_SETTINGS: AppSettings = {
   codexExecutablePath: "codex",
@@ -129,6 +138,7 @@ export function App() {
   const statusRef = useRef<SessionStatus>({ active: false, repoPath: null, startedAt: null });
   const sessionBannerRef = useRef<SessionBanner>(createInitialSessionBanner());
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const previousWorkspaceStateRef = useRef<WorkspaceState>("idle");
   const [activeView, setActiveView] = useState<"console" | "settings">("console");
   const [repoPath, setRepoPath] = useState("");
   const [promptText, setPromptText] = useState("");
@@ -177,7 +187,9 @@ export function App() {
   });
   const [readiness, setReadiness] = useState<ReadinessSummary | null>(null);
   const [utilityMode, setUtilityMode] = useState<UtilityMode>("history");
-  const [workspaceView, setWorkspaceView] = useState<"project" | "compose" | "live-run" | "results">("project");
+  const [surface, setSurface] = useState<AppSurface>("project");
+  const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSection>("compose");
+  const [inspectorOpen, setInspectorOpen] = useState(false);
 
   const readyPendingItemCount = countReadyPendingContextItems(pendingContextItems);
   const pendingContextPreviewLines = buildPendingContextPreview(pendingContextItems);
@@ -185,9 +197,8 @@ export function App() {
   const generatedPromptPreview = buildPromptPreviewOutput(promptText, pendingContextItems);
   const diffPanelText = diffViewer.diff ? buildGitDiffPanelText(diffViewer.diff) : "";
   const diffEmptyState = diffViewer.diff ? buildGitDiffEmptyState(diffViewer.diff) : "";
-  const workflowPhase = deriveWorkflowPhase({
+  const workspaceState = deriveWorkspaceState({
     sessionBannerState: sessionBanner.state,
-    repoPath,
     promptText,
     readyPendingItemCount
   });
@@ -198,7 +209,8 @@ export function App() {
       : gitStatus && (gitStatus.changedFilesCount > 0 || gitStatus.stagedFilesCount > 0 || gitStatus.untrackedFilesCount > 0)
   );
   const recommendedUtilityMode = recommendUtilityMode({
-    workflowPhase,
+    surface,
+    workspaceState,
     readyPendingItemCount,
     hasTranscriptHistory: sessions.length > 0,
     hasLoadedTranscript: Boolean(transcriptViewer.session),
@@ -210,7 +222,7 @@ export function App() {
     setProjectMessage("");
     setRepoPickerMessage("");
     if (!nextPath.trim()) {
-      setWorkspaceView("project");
+      setSurface("project");
     }
   };
 
@@ -276,15 +288,36 @@ export function App() {
   }, [recommendedUtilityMode]);
 
   useEffect(() => {
-    if (workflowPhase === "results") {
-      setWorkspaceView("results");
-      return;
+    const previousWorkspaceState = previousWorkspaceStateRef.current;
+
+    if (workspaceState !== previousWorkspaceState) {
+      setInspectorOpen((current) => {
+        if (isLiveRunWorkspaceState(workspaceState)) {
+          return false;
+        }
+
+        if (isResultsWorkspaceState(workspaceState)) {
+          return true;
+        }
+
+        return current;
+      });
+
+      if (isLiveRunWorkspaceState(workspaceState)) {
+        setWorkspaceSection("live-run");
+      } else if (isResultsWorkspaceState(workspaceState)) {
+        setWorkspaceSection("results");
+      }
     }
 
+    previousWorkspaceStateRef.current = workspaceState;
+  }, [workspaceState]);
+
+  useEffect(() => {
     if (!repoPath.trim()) {
-      setWorkspaceView("project");
+      setSurface("project");
     }
-  }, [repoPath, workflowPhase]);
+  }, [repoPath]);
 
   useEffect(() => {
     const terminalParent = terminalContainerRef.current;
@@ -507,7 +540,8 @@ export function App() {
       if (message.type === "status") {
         setStatus(message.payload);
         if (message.payload.active) {
-          setWorkspaceView("live-run");
+          setSurface("workspace");
+          setWorkspaceSection("live-run");
           setSessionActivity((current) => ({
             startedAt: message.payload.startedAt ?? current.startedAt,
             lastActivityAt: current.lastActivityAt ?? message.payload.startedAt ?? new Date().toISOString(),
@@ -681,7 +715,8 @@ export function App() {
       failedAt: null
     });
     setSessionBanner((current) => reduceSessionBanner(current, { type: "start-requested", repoPath }));
-    setWorkspaceView("live-run");
+    setSurface("workspace");
+    setWorkspaceSection("live-run");
     terminalRef.current?.clear();
     socketRef.current?.send(
       JSON.stringify({
@@ -776,6 +811,9 @@ export function App() {
     const document = payload as SavedPromptDocument;
     setPendingContextItems((current) => appendGeneratedDocumentItem(current, document));
     setUtilityMode("context");
+    if (!isLiveRunWorkspaceState(workspaceState)) {
+      setInspectorOpen(true);
+    }
     setPromptText((current) => {
       const separator = current.trim().length > 0 ? "\n" : "";
       return `${current}${separator}${buildDocumentReference(document.relativePath)}`;
@@ -846,6 +884,9 @@ export function App() {
         replaceUploadingItem(current, uploadId, createPendingContextItemFromAttachment(attachment))
       );
       setUtilityMode("context");
+      if (!isLiveRunWorkspaceState(workspaceState)) {
+        setInspectorOpen(true);
+      }
       if (attachment.kind === "zip") {
         setContextMessage(buildZipUploadSuccessMessage(attachment));
       } else {
@@ -1072,7 +1113,8 @@ export function App() {
     }));
     socketRef.current?.send(JSON.stringify({ type: "input", data: buildSubmittedPromptInput(composedPrompt) }));
     setSessionBanner((current) => reduceSessionBanner(current, { type: "prompt-submitted" }));
-    setWorkspaceView("live-run");
+    setSurface("workspace");
+    setWorkspaceSection("live-run");
     terminalRef.current?.writeln(`\n[web prompt sent]\n${composedPrompt}\n`);
     setPromptText("");
     setPendingContextItems([]);
@@ -1090,6 +1132,7 @@ export function App() {
 
   const viewTranscript = async (session: SessionHistoryItem) => {
     setUtilityMode("transcript");
+    setInspectorOpen(true);
     setTranscriptViewer({
       session,
       transcript: "",
@@ -1176,6 +1219,7 @@ export function App() {
     }
 
     setUtilityMode("changes");
+    setInspectorOpen(true);
     setDiffViewer({
       diff: null,
       isLoading: true,
@@ -1322,11 +1366,24 @@ export function App() {
             },
             formatDuration
           }}
-          workflowPhase={workflowPhase}
-          workspaceView={workspaceView}
+          surface={surface}
+          workspaceState={workspaceState}
+          workspaceSection={workspaceSection}
           utilityMode={utilityMode}
-          onSelectWorkspaceView={setWorkspaceView}
+          inspectorOpen={inspectorOpen}
+          onSelectSurface={setSurface}
+          onSelectWorkspaceSection={(nextSection) => {
+            setSurface("workspace");
+            setWorkspaceSection(nextSection);
+          }}
           onUtilityModeChange={setUtilityMode}
+          onInspectorOpen={(nextMode) => {
+            if (nextMode) {
+              setUtilityMode(nextMode);
+            }
+            setInspectorOpen(true);
+          }}
+          onInspectorClose={() => setInspectorOpen(false)}
           status={status}
           sessionBanner={sessionBanner}
           sessionActivity={sessionActivity}

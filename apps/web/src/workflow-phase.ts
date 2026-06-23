@@ -1,60 +1,82 @@
 import type { SessionBannerState } from "./session-banner";
 
-export type WorkflowPhase = "project" | "compose" | "live-run" | "results";
+export type AppSurface = "project" | "workspace";
+export type WorkspaceState =
+  | "idle"
+  | "ready-to-compose"
+  | "running"
+  | "awaiting-approval"
+  | "awaiting-input"
+  | "completed"
+  | "failed"
+  | "disconnected"
+  | "stopped";
+export type WorkspaceSection = "compose" | "live-run" | "results";
 export type UtilityMode = "context" | "history" | "transcript" | "changes";
 
-type WorkflowPhaseInput = {
+type WorkspaceStateInput = {
   sessionBannerState: SessionBannerState;
-  repoPath: string;
   promptText: string;
   readyPendingItemCount: number;
 };
 
 type UtilityModeInput = {
-  workflowPhase: WorkflowPhase;
+  surface: AppSurface;
+  workspaceState: WorkspaceState;
   readyPendingItemCount: number;
   hasTranscriptHistory: boolean;
   hasLoadedTranscript: boolean;
   hasRepoChanges: boolean;
 };
 
-const LIVE_RUN_STATES: SessionBannerState[] = [
-  "starting",
-  "running",
-  "awaiting-approval",
-  "awaiting-input",
-  "stopping"
-];
+const RUNNING_STATES: SessionBannerState[] = ["starting", "running", "stopping"];
+const RESULT_STATES: WorkspaceState[] = ["completed", "stopped", "disconnected", "failed"];
+const LIVE_RUN_STATES: WorkspaceState[] = ["running", "awaiting-approval", "awaiting-input"];
 
-const RESULTS_STATES: SessionBannerState[] = ["completed", "stopped", "disconnected", "failed"];
+export function isLiveRunWorkspaceState(workspaceState: WorkspaceState): boolean {
+  return LIVE_RUN_STATES.includes(workspaceState);
+}
 
-export function deriveWorkflowPhase({
+export function isResultsWorkspaceState(workspaceState: WorkspaceState): boolean {
+  return RESULT_STATES.includes(workspaceState);
+}
+
+export function deriveWorkspaceState({
   sessionBannerState,
-  repoPath,
   promptText,
   readyPendingItemCount
-}: WorkflowPhaseInput): WorkflowPhase {
-  if (LIVE_RUN_STATES.includes(sessionBannerState)) {
-    return "live-run";
+}: WorkspaceStateInput): WorkspaceState {
+  if (RUNNING_STATES.includes(sessionBannerState)) {
+    return "running";
   }
 
-  if (RESULTS_STATES.includes(sessionBannerState)) {
-    return "results";
+  if (sessionBannerState === "awaiting-approval") {
+    return "awaiting-approval";
   }
 
-  if (!repoPath.trim()) {
-    return "project";
+  if (sessionBannerState === "awaiting-input") {
+    return "awaiting-input";
+  }
+
+  if (
+    sessionBannerState === "completed" ||
+    sessionBannerState === "failed" ||
+    sessionBannerState === "disconnected" ||
+    sessionBannerState === "stopped"
+  ) {
+    return sessionBannerState;
   }
 
   if (promptText.trim() || readyPendingItemCount > 0) {
-    return "compose";
+    return "ready-to-compose";
   }
 
-  return "compose";
+  return "idle";
 }
 
 export function recommendUtilityMode({
-  workflowPhase,
+  surface,
+  workspaceState,
   readyPendingItemCount,
   hasTranscriptHistory,
   hasLoadedTranscript,
@@ -64,7 +86,7 @@ export function recommendUtilityMode({
     return "transcript";
   }
 
-  if (workflowPhase === "results") {
+  if (isResultsWorkspaceState(workspaceState)) {
     if (hasTranscriptHistory) {
       return "transcript";
     }
@@ -72,7 +94,7 @@ export function recommendUtilityMode({
     return hasRepoChanges ? "changes" : "history";
   }
 
-  if (workflowPhase === "live-run") {
+  if (isLiveRunWorkspaceState(workspaceState)) {
     return hasRepoChanges ? "changes" : "history";
   }
 
@@ -84,5 +106,5 @@ export function recommendUtilityMode({
     return "history";
   }
 
-  return workflowPhase === "project" ? "history" : "context";
+  return surface === "project" ? "history" : "context";
 }

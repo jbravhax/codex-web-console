@@ -3,7 +3,7 @@ import type { PendingContextItem } from "./pending-context-types";
 import type { GitDiffSummary } from "./git-diff-viewer";
 import type { SessionBanner } from "./session-banner";
 import type { SessionExitPayload, SessionFailurePayload } from "./session-diagnostics";
-import type { UtilityMode, WorkflowPhase } from "./workflow-phase";
+import type { AppSurface, UtilityMode, WorkspaceSection, WorkspaceState } from "./workflow-phase";
 
 export type ThemeSetting = "light" | "dark";
 
@@ -193,11 +193,16 @@ export type ConsoleViewProps = {
   composerPanel: ComposerPanelProps;
   repoInsightsPanel: RepoInsightsPanelProps;
   sessionHistoryPanel: SessionHistoryPanelProps;
-  workflowPhase: WorkflowPhase;
-  workspaceView: WorkflowPhase;
+  surface: AppSurface;
+  workspaceState: WorkspaceState;
+  workspaceSection: WorkspaceSection;
   utilityMode: UtilityMode;
-  onSelectWorkspaceView(nextView: WorkflowPhase): void;
+  inspectorOpen: boolean;
+  onSelectSurface(nextSurface: AppSurface): void;
+  onSelectWorkspaceSection(nextSection: WorkspaceSection): void;
   onUtilityModeChange(nextMode: UtilityMode): void;
+  onInspectorOpen(nextMode?: UtilityMode): void;
+  onInspectorClose(): void;
   status: SessionStatus;
   sessionBanner: SessionBanner;
   sessionActivity: SessionActivitySummary;

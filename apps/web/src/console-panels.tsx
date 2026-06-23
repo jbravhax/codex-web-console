@@ -11,6 +11,7 @@ import type {
 } from "./app-types";
 import type { PendingContextItem } from "./pending-context-types";
 import { formatSessionBannerStateLabel, type SessionBanner } from "./session-banner";
+import { isResultsWorkspaceState, type WorkspaceSection } from "./workflow-phase";
 
 type PendingContextGroup = {
   key: PendingContextItem["kind"];
@@ -126,6 +127,31 @@ function formatUtilityModeLabel(mode: ConsoleViewProps["utilityMode"]): string {
       return "Transcript";
     case "changes":
       return "Changes";
+  }
+}
+
+type VisualWorkspaceView = "project" | WorkspaceSection;
+
+function mapWorkspaceStateToVisualView(
+  surface: ConsoleViewProps["surface"],
+  workspaceState: ConsoleViewProps["workspaceState"]
+): VisualWorkspaceView {
+  if (surface === "project") {
+    return "project";
+  }
+
+  switch (workspaceState) {
+    case "running":
+    case "awaiting-approval":
+    case "awaiting-input":
+      return "live-run";
+    case "completed":
+    case "failed":
+    case "disconnected":
+    case "stopped":
+      return "results";
+    default:
+      return "compose";
   }
 }
 
@@ -340,9 +366,11 @@ export function ConsoleHeader({
 }
 
 function ProjectRail({
-  workflowPhase,
-  workspaceView,
-  onSelectWorkspaceView,
+  surface,
+  workspaceState,
+  workspaceSection,
+  onSelectSurface,
+  onSelectWorkspaceSection,
   projectTitle,
   projectSubtitle,
   readiness,
@@ -353,9 +381,11 @@ function ProjectRail({
   connectionStateLabel,
   onStopSession
 }: {
-  workflowPhase: ConsoleViewProps["workflowPhase"];
-  workspaceView: ConsoleViewProps["workspaceView"];
-  onSelectWorkspaceView(nextView: ConsoleViewProps["workspaceView"]): void;
+  surface: ConsoleViewProps["surface"];
+  workspaceState: ConsoleViewProps["workspaceState"];
+  workspaceSection: ConsoleViewProps["workspaceSection"];
+  onSelectSurface(nextSurface: ConsoleViewProps["surface"]): void;
+  onSelectWorkspaceSection(nextSection: ConsoleViewProps["workspaceSection"]): void;
   projectTitle: string;
   projectSubtitle: string;
   readiness: ProjectControlsProps["readiness"];
@@ -366,8 +396,9 @@ function ProjectRail({
   connectionStateLabel: string;
   onStopSession(): void;
 }) {
+  const activeVisualView = mapWorkspaceStateToVisualView(surface, workspaceState);
   const navItems: Array<{
-    view: ConsoleViewProps["workspaceView"];
+    view: VisualWorkspaceView;
     label: string;
     detail: string;
     disabled?: boolean;
@@ -416,8 +447,8 @@ function ProjectRail({
 
       <nav className="project-nav" aria-label="Workspace views">
         {navItems.map((item) => {
-          const isSelected = workspaceView === item.view;
-          const isCurrentPhase = workflowPhase === item.view;
+          const isSelected = item.view === "project" ? surface === "project" : surface === "workspace" && workspaceSection === item.view;
+          const isCurrentPhase = activeVisualView === item.view;
 
           return (
             <button
@@ -425,7 +456,14 @@ function ProjectRail({
               type="button"
               aria-label={`${item.label} view`}
               className={`project-nav-item ${isSelected ? "selected" : ""} ${isCurrentPhase ? "current-phase" : ""}`.trim()}
-              onClick={() => onSelectWorkspaceView(item.view)}
+              onClick={() => {
+                if (item.view === "project") {
+                  onSelectSurface("project");
+                  return;
+                }
+
+                onSelectWorkspaceSection(item.view);
+              }}
               disabled={item.disabled}
             >
               <span className="project-nav-copy">
@@ -686,18 +724,18 @@ export function ProjectControls({
   );
 }
 
-function WorkflowStepper({ workflowPhase }: { workflowPhase: ConsoleViewProps["workflowPhase"] }) {
-  const steps: Array<{ key: ConsoleViewProps["workflowPhase"]; label: string; detail: string }> = [
+function WorkflowStepper({ activeView }: { activeView: VisualWorkspaceView }) {
+  const steps: Array<{ key: VisualWorkspaceView; label: string; detail: string }> = [
     { key: "project", label: "Project", detail: "Select workspace" },
     { key: "compose", label: "Compose", detail: "Write your prompt" },
     { key: "live-run", label: "Live Run", detail: "Codex is working" },
     { key: "results", label: "Results", detail: "Review output" }
   ];
 
-  const activeIndex = steps.findIndex((step) => step.key === workflowPhase);
+  const activeIndex = steps.findIndex((step) => step.key === activeView);
 
   return (
-    <section className="workflow-stepper workspace-card" aria-label="Workflow progress">
+    <section className="workflow-stepper" aria-label="Workflow progress">
       {steps.map((step, index) => {
         const isComplete = index < activeIndex;
         const isActive = index === activeIndex;
@@ -714,6 +752,43 @@ function WorkflowStepper({ workflowPhase }: { workflowPhase: ConsoleViewProps["w
         );
       })}
     </section>
+  );
+}
+
+function InspectorLauncher({
+  utilityMode,
+  inspectorOpen,
+  onOpenInspector,
+  onCloseInspector
+}: {
+  utilityMode: ConsoleViewProps["utilityMode"];
+  inspectorOpen: boolean;
+  onOpenInspector(nextMode: ConsoleViewProps["utilityMode"]): void;
+  onCloseInspector(): void;
+}) {
+  return (
+    <div className="inspector-launcher" aria-label="Review tools">
+      {( ["context", "history", "transcript", "changes"] as const).map((mode) => {
+        const isActive = inspectorOpen && utilityMode === mode;
+
+        return (
+          <button
+            key={mode}
+            type="button"
+            className={`inspector-launcher-button ${isActive ? "active" : ""}`.trim()}
+            aria-pressed={isActive}
+            onClick={() => onOpenInspector(mode)}
+          >
+            {formatUtilityModeLabel(mode)}
+          </button>
+        );
+      })}
+      {inspectorOpen ? (
+        <button type="button" className="ghost inspector-close-button" onClick={onCloseInspector}>
+          Close inspector
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -1264,12 +1339,14 @@ function ResultsSummaryCard({
 function UtilityPanel({
   utilityMode,
   onUtilityModeChange,
+  onCloseInspector,
   pendingContextPanel,
   repoInsightsPanel,
   sessionHistoryPanel
 }: {
   utilityMode: ConsoleViewProps["utilityMode"];
   onUtilityModeChange(nextMode: ConsoleViewProps["utilityMode"]): void;
+  onCloseInspector(): void;
   pendingContextPanel: ConsoleViewProps["pendingContextPanel"];
   repoInsightsPanel: ConsoleViewProps["repoInsightsPanel"];
   sessionHistoryPanel: ConsoleViewProps["sessionHistoryPanel"];
@@ -1294,6 +1371,9 @@ function UtilityPanel({
           <p className="section-kicker">Review</p>
           <h2>{formatUtilityModeLabel(utilityMode)}</h2>
         </div>
+        <button type="button" className="ghost inspector-close-button" onClick={onCloseInspector}>
+          Close
+        </button>
       </div>
       <div className="utility-mode-tabs" role="tablist" aria-label="Utility panels">
         {utilityTabButtons}
@@ -1352,38 +1432,50 @@ export function ConsoleView({
   composerPanel,
   repoInsightsPanel,
   sessionHistoryPanel,
-  workflowPhase,
-  workspaceView,
+  surface,
+  workspaceState,
+  workspaceSection,
   utilityMode,
-  onSelectWorkspaceView,
+  inspectorOpen,
+  onSelectSurface,
+  onSelectWorkspaceSection,
   onUtilityModeChange,
+  onInspectorOpen,
+  onInspectorClose,
   status,
   sessionBanner,
   sessionActivity,
   latestSession,
   terminalContainerRef
 }: ConsoleViewProps) {
+  const visualWorkspaceView = mapWorkspaceStateToVisualView(surface, workspaceState);
   const projectTitle = formatProjectTitle(projectControls.repoPath, projectControls.defaultRepoRoot);
   const projectSubtitle = buildProjectSubtitle(projectControls.repoPath, projectControls.defaultRepoRoot);
   const terminalGuidance = buildTerminalGuidance(sessionBanner);
-  const hasResults = workflowPhase === "results" || Boolean(latestSession);
-  const showResultsSummary = workspaceView === "results";
+  const hasResults = isResultsWorkspaceState(workspaceState) || Boolean(latestSession);
+  const showResultsSummary = surface === "workspace" && workspaceSection === "results";
   const showTerminalGuidance =
     sessionBanner.state === "awaiting-approval" ||
     sessionBanner.state === "awaiting-input" ||
     sessionBanner.state === "disconnected" ||
     sessionBanner.state === "failed";
-  const showProjectWorkspace = workspaceView === "project";
-  const showComposeWorkspace = workspaceView === "compose";
-  const showLiveRunWorkspace = workspaceView === "live-run";
+  const showProjectWorkspace = surface === "project";
+  const showComposeWorkspace = surface === "workspace" && workspaceSection === "compose";
+  const showLiveRunWorkspace = surface === "workspace" && workspaceSection === "live-run";
 
   return (
-    <div className={`console-layout workflow-${workflowPhase} workspace-view-${workspaceView}`}>
+    <div
+      className={`console-layout workflow-${visualWorkspaceView} workspace-view-${showProjectWorkspace ? "project" : workspaceSection} ${
+        inspectorOpen ? "inspector-open" : "inspector-closed"
+      }`.trim()}
+    >
       <aside className="control-rail">
         <ProjectRail
-          workflowPhase={workflowPhase}
-          workspaceView={workspaceView}
-          onSelectWorkspaceView={onSelectWorkspaceView}
+          surface={surface}
+          workspaceState={workspaceState}
+          workspaceSection={workspaceSection}
+          onSelectSurface={onSelectSurface}
+          onSelectWorkspaceSection={onSelectWorkspaceSection}
           projectTitle={projectTitle}
           projectSubtitle={projectSubtitle}
           readiness={projectControls.readiness}
@@ -1397,7 +1489,15 @@ export function ConsoleView({
       </aside>
 
       <main className="workspace-main">
-        <WorkflowStepper workflowPhase={workspaceView} />
+        <section className="workspace-topbar workspace-card">
+          <WorkflowStepper activeView={showProjectWorkspace ? "project" : workspaceSection} />
+          <InspectorLauncher
+            utilityMode={utilityMode}
+            inspectorOpen={inspectorOpen}
+            onOpenInspector={onInspectorOpen}
+            onCloseInspector={onInspectorClose}
+          />
+        </section>
 
         {showProjectWorkspace ? <ProjectControls {...projectControls} /> : null}
 
@@ -1463,10 +1563,10 @@ export function ConsoleView({
             sessionActivity={sessionActivity}
             latestSession={latestSession}
             repoInsightsPanel={repoInsightsPanel}
-            onOpenTranscript={() => onUtilityModeChange("transcript")}
-            onOpenChanges={() => onUtilityModeChange("changes")}
+            onOpenTranscript={() => onInspectorOpen("transcript")}
+            onOpenChanges={() => onInspectorOpen("changes")}
             onPrepareNextPrompt={() => {
-              onSelectWorkspaceView("compose");
+              onSelectWorkspaceSection("compose");
               const promptInput = document.getElementById("prompt-input");
               if (promptInput instanceof HTMLTextAreaElement) {
                 promptInput.focus();
@@ -1478,15 +1578,18 @@ export function ConsoleView({
         ) : null}
       </main>
 
-      <aside className="insights-rail utility-rail">
-        <UtilityPanel
-          utilityMode={utilityMode}
-          onUtilityModeChange={onUtilityModeChange}
-          pendingContextPanel={pendingContextPanel}
-          repoInsightsPanel={repoInsightsPanel}
-          sessionHistoryPanel={sessionHistoryPanel}
-        />
-      </aside>
+      {inspectorOpen ? (
+        <aside className="insights-rail utility-rail">
+          <UtilityPanel
+            utilityMode={utilityMode}
+            onUtilityModeChange={onUtilityModeChange}
+            onCloseInspector={onInspectorClose}
+            pendingContextPanel={pendingContextPanel}
+            repoInsightsPanel={repoInsightsPanel}
+            sessionHistoryPanel={sessionHistoryPanel}
+          />
+        </aside>
+      ) : null}
     </div>
   );
 }

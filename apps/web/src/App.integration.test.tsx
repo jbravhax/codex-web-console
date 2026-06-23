@@ -251,6 +251,25 @@ function createDeferredPromise<T>() {
   return { promise, resolve };
 }
 
+function getInspectorLauncherButton(name: "Context" | "History" | "Transcript" | "Changes") {
+  return screen
+    .getAllByRole("button", { name })
+    .find((button) => button.getAttribute("role") !== "tab");
+}
+
+async function openInspectorMode(name: "Context" | "History" | "Transcript" | "Changes") {
+  const launcherButton = getInspectorLauncherButton(name);
+  if (!launcherButton) {
+    throw new Error(`Expected to find inspector launcher button for ${name}.`);
+  }
+
+  fireEvent.click(launcherButton);
+
+  await waitFor(() => {
+    expect(screen.getByRole("tab", { name }).getAttribute("aria-selected")).toBe("true");
+  });
+}
+
 beforeEach(() => {
   FakeWebSocket.instances = [];
   vi.stubGlobal("WebSocket", FakeWebSocket);
@@ -705,9 +724,13 @@ describe("App integration", () => {
   it("shows intentional empty states in each utility mode", async () => {
     renderApp();
 
+    await openInspectorMode("Context");
     expect(await screen.findByText("No context added yet. Start a session first.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: "History" }));
+    await waitFor(() => {
+      expect(screen.queryByText("Loading recent sessions...")).toBeNull();
+    });
     expect(await screen.findByText("No previous sessions yet.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: "Transcript" }));
@@ -730,6 +753,7 @@ describe("App integration", () => {
     });
 
     expect(await screen.findByText(/Saved 12,000 characters to \.codex-web\/documents\/pasted-20260621-120000\.md\./)).toBeTruthy();
+    await openInspectorMode("Context");
     expect(screen.getByText("Large pasted documents")).toBeTruthy();
     expect(screen.getByText(".codex-web/documents/pasted-20260621-120000.md")).toBeTruthy();
   });
@@ -765,6 +789,7 @@ describe("App integration", () => {
       }
     });
 
+    await openInspectorMode("Context");
     expect(await screen.findByText("Large pasted documents")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
@@ -799,6 +824,7 @@ describe("App integration", () => {
       }
     });
 
+    await openInspectorMode("History");
     const transcriptButtons = await screen.findAllByRole("button", { name: "View transcript" });
 
     fireEvent.click(transcriptButtons[0]);
@@ -827,6 +853,7 @@ describe("App integration", () => {
       }
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "Transcript" }));
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
     expect(await screen.findByRole("button", { name: "Download .txt" })).toBeTruthy();
@@ -856,6 +883,7 @@ describe("App integration", () => {
       }
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "Transcript" }));
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
     fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
@@ -886,6 +914,7 @@ describe("App integration", () => {
       }
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "Transcript" }));
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
     fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
@@ -904,6 +933,10 @@ describe("App integration", () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
 
+    await waitFor(() => {
+      expect(document.querySelector(".console-layout.workspace-view-live-run")).toBeTruthy();
+    });
+    await openInspectorMode("Changes");
     fireEvent.click(await screen.findByRole("button", { name: "Inspect changes" }));
     expect(await screen.findByText("Loading diff...")).toBeTruthy();
 
@@ -928,6 +961,10 @@ describe("App integration", () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
 
+    await waitFor(() => {
+      expect(document.querySelector(".console-layout.workspace-view-live-run")).toBeTruthy();
+    });
+    await openInspectorMode("Changes");
     fireEvent.click(await screen.findByRole("button", { name: "Inspect changes" }));
 
     const diffPanel = await screen.findByText((content, element) => {
@@ -955,8 +992,9 @@ describe("App integration", () => {
     emitSessionStatus(socket, true, "/workspace/default-project");
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true");
+      expect(document.querySelector(".console-layout.workspace-view-live-run")).toBeTruthy();
     });
+    await openInspectorMode("Changes");
 
     fireEvent.click(screen.getByRole("tab", { name: "Context" }));
     await waitFor(() => {
