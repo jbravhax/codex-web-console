@@ -276,8 +276,8 @@ export function App() {
   }, [recommendedUtilityMode]);
 
   useEffect(() => {
-    if (workflowPhase === "live-run" || workflowPhase === "results") {
-      setWorkspaceView(workflowPhase);
+    if (workflowPhase === "results") {
+      setWorkspaceView("results");
       return;
     }
 
@@ -287,6 +287,11 @@ export function App() {
   }, [repoPath, workflowPhase]);
 
   useEffect(() => {
+    const terminalParent = terminalContainerRef.current;
+    if (!terminalParent) {
+      return;
+    }
+
     const terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
@@ -299,7 +304,7 @@ export function App() {
     const fitAddon = new FitAddon();
 
     terminal.loadAddon(fitAddon);
-    terminal.open(terminalContainerRef.current!);
+    terminal.open(terminalParent);
     fitAddon.fit();
     terminal.writeln("Codex CLI Web Console");
     terminal.writeln("Enter one real project folder path and start a session.");
@@ -323,7 +328,7 @@ export function App() {
     };
 
     resizeObserverRef.current = new ResizeObserver(handleResize);
-    resizeObserverRef.current.observe(terminalContainerRef.current!);
+    resizeObserverRef.current.observe(terminalParent);
     window.addEventListener("resize", handleResize);
     terminal.onResize(({ cols, rows }) => {
       if (statusRef.current.active) {

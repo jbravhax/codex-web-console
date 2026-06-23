@@ -1403,54 +1403,58 @@ export function ConsoleView({
 
         {showComposeWorkspace ? <ComposerPanel {...composerPanel} /> : null}
 
-        {showLiveRunWorkspace ? (
-          <>
-            <section className={`terminal-section workspace-card ${status.active ? "terminal-section-live" : ""}`.trim()}>
-              <div
-                className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
-                  sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
-                }`}
-                data-session-state={sessionBanner.state}
-              >
-                <div className="terminal-stage-header">
-                  <div>
-                    <p className="section-kicker">Live run</p>
-                    <h2>Live Codex terminal</h2>
-                    <p className="terminal-subcopy">
-                      {status.active
-                        ? sessionBanner.state === "awaiting-approval"
-                          ? "Codex paused for approval."
-                          : "Codex is running your task."
-                        : "Start a session to open the terminal workspace."}
-                    </p>
-                  </div>
-                  <div className="terminal-stage-meta">
-                    {sessionBanner.state === "awaiting-approval" || sessionBanner.state === "awaiting-input" ? (
-                      <span className="section-chip">{formatSessionBannerStateLabel(sessionBanner.state)}</span>
-                    ) : null}
-                    <div className="terminal-toolbar">
-                      <button
-                        type="button"
-                        className="ghost terminal-tool-button"
-                        onClick={() => {
-                          const terminal = terminalContainerRef.current;
-                          terminal?.scrollIntoView({ block: "center", behavior: "smooth" });
-                        }}
-                      >
-                        Focus
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                {showTerminalGuidance && terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
-                <div ref={terminalContainerRef} className="terminal-panel" />
+        <section
+          className={`terminal-section workspace-card ${status.active ? "terminal-section-live" : ""} ${
+            showLiveRunWorkspace ? "" : "workspace-pane-hidden"
+          }`.trim()}
+          aria-hidden={!showLiveRunWorkspace}
+        >
+          <div
+            className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
+              sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
+            }`}
+            data-session-state={sessionBanner.state}
+          >
+            <div className="terminal-stage-header">
+              <div>
+                <p className="section-kicker">Live run</p>
+                <h2>Live Codex terminal</h2>
+                <p className="terminal-subcopy">
+                  {status.active
+                    ? sessionBanner.state === "awaiting-approval"
+                      ? "Codex paused for approval."
+                      : "Codex is running your task."
+                    : "Start a session to open the terminal workspace."}
+                </p>
               </div>
-            </section>
-            <ApprovalActionStrip sessionBanner={sessionBanner} />
-            <section className="workspace-followup">
-              <ComposerPanel {...composerPanel} />
-            </section>
-          </>
+              <div className="terminal-stage-meta">
+                {sessionBanner.state === "awaiting-approval" || sessionBanner.state === "awaiting-input" ? (
+                  <span className="section-chip">{formatSessionBannerStateLabel(sessionBanner.state)}</span>
+                ) : null}
+                <div className="terminal-toolbar">
+                  <button
+                    type="button"
+                    className="ghost terminal-tool-button"
+                    onClick={() => {
+                      const terminal = terminalContainerRef.current;
+                      terminal?.scrollIntoView({ block: "center", behavior: "smooth" });
+                    }}
+                  >
+                    Focus
+                  </button>
+                </div>
+              </div>
+            </div>
+            {showTerminalGuidance && terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
+            <div ref={terminalContainerRef} className="terminal-panel" />
+          </div>
+        </section>
+
+        {showLiveRunWorkspace ? <ApprovalActionStrip sessionBanner={sessionBanner} /> : null}
+        {showLiveRunWorkspace ? (
+          <section className="workspace-followup">
+            <ComposerPanel {...composerPanel} />
+          </section>
         ) : null}
 
         {showResultsSummary ? (

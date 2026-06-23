@@ -1154,6 +1154,17 @@ textarea {
   gap: 1.15rem;
 }
 
+.workspace-pane-hidden {
+  position: absolute;
+  left: -99999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .rail-card,
 .workspace-card {
   border: 1px solid var(--panel-border);
