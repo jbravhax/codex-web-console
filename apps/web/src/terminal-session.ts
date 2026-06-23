@@ -1,5 +1,6 @@
 const BRACKETED_PASTE_START = "\u001b[200~";
 const BRACKETED_PASTE_END = "\u001b[201~";
+const SUBMIT_KEY = "\r";
 
 export type TerminalOutputState = "approval" | "awaiting-input" | "completed" | "working" | "idle";
 
@@ -7,9 +8,17 @@ function normalizePromptNewlines(prompt: string): string {
   return prompt.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
 
-export function buildSubmittedPromptInput(prompt: string): string {
+export function buildPromptPasteInput(prompt: string): string {
   const normalizedPrompt = normalizePromptNewlines(prompt);
-  return `${BRACKETED_PASTE_START}${normalizedPrompt}${BRACKETED_PASTE_END}\r`;
+  return `${BRACKETED_PASTE_START}${normalizedPrompt}${BRACKETED_PASTE_END}`;
+}
+
+export function buildPromptSubmitInput(): string {
+  return SUBMIT_KEY;
+}
+
+export function buildSubmittedPromptInput(prompt: string): string {
+  return `${buildPromptPasteInput(prompt)}${buildPromptSubmitInput()}`;
 }
 
 export function detectTerminalOutputState(output: string): TerminalOutputState {

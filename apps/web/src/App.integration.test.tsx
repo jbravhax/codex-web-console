@@ -5,7 +5,7 @@ import * as clipboardModule from "./clipboard";
 import { loadGitDiff } from "./git-diff-viewer";
 import { REPO_PICKER_UNSUPPORTED_MESSAGE, chooseRepoDirectory } from "./repo-picker";
 import { loadSessionTranscript } from "./session-transcripts";
-import { buildSubmittedPromptInput } from "./terminal-session";
+import { buildPromptPasteInput, buildPromptSubmitInput } from "./terminal-session";
 
 vi.mock("@xterm/xterm", () => {
   class TerminalMock {
@@ -520,12 +520,20 @@ describe("App integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send prompt" }));
 
     expect((await screen.findAllByText("Running request")).length).toBeGreaterThanOrEqual(1);
-    expect(socket.sent).toContain(
-      JSON.stringify({
-        type: "input",
-        data: buildSubmittedPromptInput("Reply with exactly: OK")
-      })
-    );
+    await waitFor(() => {
+      expect(socket.sent).toContain(
+        JSON.stringify({
+          type: "input",
+          data: buildPromptPasteInput("Reply with exactly: OK")
+        })
+      );
+      expect(socket.sent).toContain(
+        JSON.stringify({
+          type: "input",
+          data: buildPromptSubmitInput()
+        })
+      );
+    });
 
     socket.emitMessage({
       type: "output",

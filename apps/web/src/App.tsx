@@ -67,7 +67,7 @@ import {
   downloadTranscriptText,
   loadSessionTranscript
 } from "./session-transcripts";
-import { buildSubmittedPromptInput, detectTerminalOutputState } from "./terminal-session";
+import { buildPromptPasteInput, buildPromptSubmitInput, detectTerminalOutputState } from "./terminal-session";
 import {
   buildSessionErrorDisplay,
   buildUnexpectedExitDisplay,
@@ -1062,7 +1062,12 @@ export function App() {
       disconnectedAt: null,
       failedAt: null
     }));
-    socketRef.current?.send(JSON.stringify({ type: "input", data: buildSubmittedPromptInput(composedPrompt) }));
+    socketRef.current?.send(JSON.stringify({ type: "input", data: buildPromptPasteInput(composedPrompt) }));
+    window.setTimeout(() => {
+      if (socketRef.current?.readyState === WebSocket.OPEN && statusRef.current.active) {
+        socketRef.current.send(JSON.stringify({ type: "input", data: buildPromptSubmitInput() }));
+      }
+    }, 20);
     setSessionBanner((current) => reduceSessionBanner(current, { type: "prompt-submitted" }));
     setPage("workspace");
     terminalRef.current?.writeln(`\n[web prompt sent]\n${composedPrompt}\n`);

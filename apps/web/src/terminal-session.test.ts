@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { buildSubmittedPromptInput, detectTerminalOutputState } from "./terminal-session";
+import { buildPromptPasteInput, buildPromptSubmitInput, buildSubmittedPromptInput, detectTerminalOutputState } from "./terminal-session";
+
+describe("buildPromptPasteInput", () => {
+  it("wraps prompt text in bracketed paste markers without submitting it", () => {
+    expect(buildPromptPasteInput("Hello Codex")).toBe("\u001b[200~Hello Codex\u001b[201~");
+  });
+
+  it("normalizes prompt newlines before wrapping the paste payload", () => {
+    expect(buildPromptPasteInput("line 1\r\nline 2\rline 3")).toBe("\u001b[200~line 1\nline 2\nline 3\u001b[201~");
+  });
+});
+
+describe("buildPromptSubmitInput", () => {
+  it("returns a terminal enter keystroke", () => {
+    expect(buildPromptSubmitInput()).toBe("\r");
+  });
+});
 
 describe("buildSubmittedPromptInput", () => {
   it("wraps prompt text in bracketed paste markers and submits with enter", () => {

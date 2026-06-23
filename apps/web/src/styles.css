@@ -3620,6 +3620,47 @@ body {
   gap: 1.25rem;
 }
 
+.workspace-content-stack {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.workspace-region {
+  min-width: 0;
+}
+
+.workspace-content-stack.composer-first .workspace-region-composer {
+  order: 1;
+}
+
+.workspace-content-stack.composer-first .workspace-region-terminal {
+  order: 2;
+}
+
+.workspace-content-stack.composer-first .workspace-region-approval {
+  order: 3;
+}
+
+.workspace-content-stack.composer-first .workspace-region-results {
+  order: 4;
+}
+
+.workspace-content-stack.terminal-first .workspace-region-terminal {
+  order: 1;
+}
+
+.workspace-content-stack.terminal-first .workspace-region-approval {
+  order: 2;
+}
+
+.workspace-content-stack.terminal-first .workspace-region-results {
+  order: 3;
+}
+
+.workspace-content-stack.terminal-first .workspace-region-composer {
+  order: 4;
+}
+
 .workspace-page-shell,
 .review-page {
   display: grid;

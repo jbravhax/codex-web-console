@@ -1493,39 +1493,50 @@ export function ConsoleView({
                       : formatWorkspaceStateLabel(workspaceState)}
               </span>
             </section>
+            <div className={`workspace-content-stack ${terminalFirst ? "terminal-first" : "composer-first"}`}>
+              <div className="workspace-region workspace-region-composer">
+                <ComposerPanel {...composerPanel} />
+              </div>
 
-            {terminalFirst ? (
-              <>
-                <section className={`terminal-section workspace-card ${status.active ? "terminal-section-live" : ""}`.trim()}>
-                  <div
-                    className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
-                      sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
-                    }`}
-                    data-session-state={sessionBanner.state}
-                  >
-                    <div className="terminal-stage-header">
-                      <div>
-                        <p className="section-kicker">Output</p>
-                        <h2>Codex terminal</h2>
-                        <p className="terminal-subcopy">
-                          {status.active
-                            ? sessionBanner.state === "awaiting-approval"
-                              ? "Codex paused for approval."
-                              : sessionBanner.state === "awaiting-input"
-                                ? "Codex is waiting for your next instruction."
-                                : isResultsWorkspaceState(workspaceState)
-                                  ? "The latest session output stays here while you review it."
-                                  : "Codex is working in this terminal."
-                            : "Start a session to turn this into the live working area."}
-                        </p>
-                      </div>
+              <section
+                className={`terminal-section workspace-card workspace-region workspace-region-terminal ${status.active ? "terminal-section-live" : ""}`.trim()}
+              >
+                <div
+                  className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
+                    sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
+                  }`}
+                  data-session-state={sessionBanner.state}
+                >
+                  <div className="terminal-stage-header">
+                    <div>
+                      <p className="section-kicker">Output</p>
+                      <h2>Codex terminal</h2>
+                      <p className="terminal-subcopy">
+                        {status.active
+                          ? sessionBanner.state === "awaiting-approval"
+                            ? "Codex paused for approval."
+                            : sessionBanner.state === "awaiting-input"
+                              ? "Codex is waiting for your next instruction."
+                              : isResultsWorkspaceState(workspaceState)
+                                ? "The latest session output stays here while you review it."
+                                : "Codex is working in this terminal."
+                          : "Start a session to turn this into the live working area."}
+                      </p>
                     </div>
-                    {showTerminalGuidance && terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
-                    <div ref={terminalContainerRef} className="terminal-panel" />
                   </div>
-                </section>
-                {showWorkspacePage ? <ApprovalActionStrip sessionBanner={sessionBanner} /> : null}
-                {showResultsSummary ? (
+                  {showTerminalGuidance && terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
+                  <div ref={terminalContainerRef} className="terminal-panel" />
+                </div>
+              </section>
+
+              {showWorkspacePage ? (
+                <div className="workspace-region workspace-region-approval">
+                  <ApprovalActionStrip sessionBanner={sessionBanner} />
+                </div>
+              ) : null}
+
+              {showResultsSummary ? (
+                <div className="workspace-region workspace-region-results">
                   <ResultsSummaryCard
                     sessionBanner={sessionBanner}
                     sessionActivity={sessionActivity}
@@ -1543,34 +1554,9 @@ export function ConsoleView({
                     }}
                     formatDuration={sessionHistoryPanel.formatDuration}
                   />
-                ) : null}
-                <ComposerPanel {...composerPanel} />
-              </>
-            ) : (
-              <>
-                <ComposerPanel {...composerPanel} />
-                <section className={`terminal-section workspace-card ${status.active ? "terminal-section-live" : ""}`.trim()}>
-                  <div
-                    className={`terminal-stage ${sessionBanner.state === "awaiting-approval" ? "terminal-stage-attention" : ""} ${
-                      sessionBanner.state === "failed" || sessionBanner.state === "disconnected" ? "terminal-stage-muted" : ""
-                    }`}
-                    data-session-state={sessionBanner.state}
-                  >
-                    <div className="terminal-stage-header">
-                      <div>
-                        <p className="section-kicker">Output</p>
-                        <h2>Codex terminal</h2>
-                        <p className="terminal-subcopy">
-                          {status.active ? "Codex is working in this terminal." : "Start a session to turn this into the live working area."}
-                        </p>
-                      </div>
-                    </div>
-                    {showTerminalGuidance && terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
-                    <div ref={terminalContainerRef} className="terminal-panel" />
-                  </div>
-                </section>
-              </>
-            )}
+                </div>
+              ) : null}
+            </div>
           </>
         ) : null}
 
