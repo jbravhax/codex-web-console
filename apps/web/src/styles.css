@@ -3360,6 +3360,570 @@ body {
   display: none;
 }
 
+/* v0.6 workspace reset */
+
+:root,
+:root[data-theme="light"] {
+  --workspace-surface: rgba(255, 255, 255, 0.78);
+  --workspace-line: rgba(15, 23, 42, 0.1);
+  --workspace-line-strong: rgba(15, 23, 42, 0.16);
+  --workspace-hover: rgba(15, 23, 42, 0.05);
+  --workspace-active: rgba(17, 24, 39, 0.08);
+  --workspace-shadow: 0 22px 60px rgba(15, 23, 42, 0.08);
+}
+
+.app-shell {
+  max-width: 100%;
+  min-height: 100vh;
+  padding: 1.5rem 1.75rem 1.75rem;
+}
+
+.top-status-bar {
+  padding: 0 0 1rem;
+  margin-bottom: 0.9rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.top-status-brand {
+  min-width: 0;
+}
+
+.top-status-brand h1 {
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+
+.top-status-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.top-status-chip {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--workspace-line);
+  background: rgba(255, 255, 255, 0.56);
+  box-shadow: none;
+}
+
+.top-status-label {
+  color: var(--muted);
+}
+
+.top-status-actions {
+  gap: 0.55rem;
+}
+
+.app-switcher,
+.app-switcher.secondary {
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+}
+
+.console-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.control-rail {
+  position: sticky;
+  top: 1.5rem;
+  align-self: start;
+  min-width: 0;
+}
+
+.project-rail,
+.control-rail .rail-card {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.project-rail-header {
+  gap: 0.15rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--workspace-line);
+}
+
+.project-rail-header strong {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.project-rail-header span {
+  font-size: 1.02rem;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.project-rail-header small {
+  color: var(--muted);
+}
+
+.project-nav-menu {
+  gap: 0.2rem;
+}
+
+.project-menu-item {
+  width: 100%;
+  justify-content: space-between;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.project-menu-item:hover:not(:disabled) {
+  background: var(--workspace-hover);
+  transform: none;
+  box-shadow: none;
+}
+
+.project-menu-item.selected {
+  background: var(--workspace-active);
+  color: var(--text);
+}
+
+.project-nav-copy strong {
+  font-size: 0.97rem;
+  font-weight: 620;
+}
+
+.project-nav-badge {
+  min-width: 1.5rem;
+  padding: 0.18rem 0.42rem;
+  border-radius: 999px;
+  border: 1px solid var(--workspace-line);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.workspace-status-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.workspace-status-header {
+  margin-bottom: 0.18rem;
+}
+
+.workspace-status-card p,
+.project-rail-connection,
+.project-path-guidance,
+.helper-text,
+.pending-context-subtitle,
+.prompt-preview-summary,
+.terminal-subcopy {
+  color: var(--muted);
+}
+
+.project-rail-status {
+  padding-top: 0;
+}
+
+.project-health,
+.project-health-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.project-health::before {
+  display: none;
+}
+
+.rail-action-dock {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--workspace-line);
+}
+
+.rail-mini-action {
+  padding: 0.58rem 0.78rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  box-shadow: none;
+}
+
+.workspace-main {
+  min-width: 0;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.workspace-page-shell,
+.review-page {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.6rem 1.8rem 1.8rem;
+  border: 1px solid var(--workspace-line);
+  border-radius: 28px;
+  background: var(--workspace-surface);
+  box-shadow: var(--workspace-shadow);
+  backdrop-filter: blur(20px);
+}
+
+.workspace-page-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0;
+  border: 0;
+}
+
+.workspace-page-header h2,
+.section-heading h2,
+.composer-header h2,
+.terminal-stage-header h2,
+.diff-header h2,
+.transcript-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.section-kicker {
+  margin: 0 0 0.18rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.section-chip {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--workspace-line);
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--muted);
+}
+
+.controls,
+.workspace-card,
+.prompt-panel,
+.terminal-section,
+.results-summary-card,
+.utility-surface,
+.context-card,
+.history-section,
+.settings-section {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.section-heading,
+.composer-header,
+.terminal-stage-header,
+.prompt-preview-header,
+.diff-header,
+.transcript-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.project-workspace-summary,
+.composer-header .helper-text,
+.subtle-helper {
+  margin-top: 0.2rem;
+}
+
+.repo-input-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+}
+
+.repo-input-row input,
+.prompt-textarea,
+.prompt-preview-panel,
+.recent-project-chip,
+.readiness-item,
+.attachment-chip,
+.git-stat-card,
+.diff-panel,
+.transcript-panel,
+.results-summary-grid > div,
+.history-item,
+.transcript-empty-state,
+.prompt-preview-empty-state,
+.prompt-preview-section,
+.approval-action-strip,
+.terminal-guidance {
+  border-radius: 18px;
+}
+
+.repo-input-row input,
+.prompt-textarea {
+  border: 1px solid var(--workspace-line);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: none;
+}
+
+.prompt-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.attachment-actions {
+  justify-content: flex-end;
+}
+
+.attachment-actions .helper-text {
+  max-width: 13rem;
+  text-align: right;
+}
+
+.prompt-textarea {
+  min-height: 150px;
+}
+
+.prompt-preview-panel {
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--workspace-line);
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.prompt-actions {
+  justify-content: flex-start;
+}
+
+.prompt-actions button {
+  min-width: 9rem;
+}
+
+.terminal-section {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.terminal-stage {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.terminal-stage-header {
+  padding: 0;
+}
+
+.terminal-panel {
+  height: min(52vh, 560px);
+  min-height: 320px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 22px;
+  background: #0b0f15;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.terminal-guidance,
+.approval-action-strip {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--workspace-line);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.terminal-stage-attention .terminal-guidance,
+.approval-action-strip.approval {
+  border-color: rgba(245, 158, 11, 0.32);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.review-page {
+  min-height: 65vh;
+}
+
+.context-card,
+.repo-insights-card,
+.session-history-panel,
+.transcript-viewer,
+.diff-viewer {
+  display: grid;
+  gap: 1rem;
+}
+
+.history-list,
+.attachment-groups,
+.git-stats,
+.results-summary-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.history-item,
+.recent-project-chip,
+.attachment-chip,
+.git-stat-card,
+.readiness-item,
+.prompt-preview-section,
+.prompt-preview-empty-state,
+.transcript-empty-state {
+  border: 1px solid var(--workspace-line);
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: none;
+}
+
+.diff-panel,
+.transcript-panel {
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--workspace-line);
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.collapsible-section {
+  padding: 0.85rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--workspace-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.controls .collapsible-section:first-of-type {
+  margin-top: 0.35rem;
+}
+
+.collapsible-section-header {
+  align-items: center;
+}
+
+.collapsible-toggle,
+.diff-actions button,
+.transcript-export-actions button,
+.history-actions button,
+.prompt-preview-actions button {
+  padding: 0.55rem 0.82rem;
+  border-radius: 12px;
+}
+
+.project-secondary-sections {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.session-banner {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--workspace-line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.64);
+  box-shadow: none;
+}
+
+.session-banner-routine {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.session-banner-exception {
+  border-color: rgba(245, 158, 11, 0.32);
+  background: rgba(255, 248, 235, 0.96);
+}
+
+.results-summary-card {
+  padding-top: 0.35rem;
+}
+
+.results-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+@media (max-width: 1200px) {
+  .console-layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    padding: 1rem;
+  }
+
+  .top-status-bar {
+    flex-wrap: wrap;
+    align-items: start;
+  }
+
+  .top-status-center {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .console-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .control-rail {
+    position: static;
+  }
+
+  .rail-action-dock {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace-page-shell,
+  .review-page {
+    padding: 1.15rem;
+    border-radius: 22px;
+  }
+
+  .attachment-actions,
+  .section-heading,
+  .composer-header,
+  .terminal-stage-header,
+  .workspace-page-header,
+  .prompt-preview-header,
+  .prompt-preview-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .attachment-actions .helper-text {
+    max-width: none;
+    text-align: left;
+  }
+
+  .rail-action-dock {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1280px) {
   .console-layout.inspector-open,
   .console-layout.inspector-closed {

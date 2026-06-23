@@ -13,6 +13,7 @@ import {
 } from "./app-feedback";
 import type {
   AppSettings,
+  ConsolePage,
   CreateProjectOptions,
   CreateProjectResponse,
   DiffViewerState,
@@ -79,10 +80,6 @@ import {
   deriveWorkspaceState,
   isLiveRunWorkspaceState,
   isResultsWorkspaceState,
-  recommendUtilityMode,
-  type AppSurface,
-  type UtilityMode,
-  type WorkspaceSection,
   type WorkspaceState
 } from "./workflow-phase";
 
@@ -186,10 +183,7 @@ export function App() {
     failedAt: null
   });
   const [readiness, setReadiness] = useState<ReadinessSummary | null>(null);
-  const [utilityMode, setUtilityMode] = useState<UtilityMode>("history");
-  const [surface, setSurface] = useState<AppSurface>("project");
-  const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSection>("compose");
-  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [page, setPage] = useState<ConsolePage>("workspace");
 
   const readyPendingItemCount = countReadyPendingContextItems(pendingContextItems);
   const pendingContextPreviewLines = buildPendingContextPreview(pendingContextItems);
@@ -208,22 +202,10 @@ export function App() {
       ? diffViewer.diff.stagedDiff.trim() || diffViewer.diff.unstagedDiff.trim()
       : gitStatus && (gitStatus.changedFilesCount > 0 || gitStatus.stagedFilesCount > 0 || gitStatus.untrackedFilesCount > 0)
   );
-  const recommendedUtilityMode = recommendUtilityMode({
-    surface,
-    workspaceState,
-    readyPendingItemCount,
-    hasTranscriptHistory: sessions.length > 0,
-    hasLoadedTranscript: Boolean(transcriptViewer.session),
-    hasRepoChanges
-  });
-
   const updateRepoPath = (nextPath: string) => {
     setRepoPath(nextPath);
     setProjectMessage("");
     setRepoPickerMessage("");
-    if (!nextPath.trim()) {
-      setSurface("project");
-    }
   };
 
   const setCopyFeedback = (subject: string, result: Awaited<ReturnType<typeof copyRelativePath>>) => {
@@ -284,48 +266,12 @@ export function App() {
   }, [settings.theme]);
 
   useLayoutEffect(() => {
-    if (!inspectorOpen) {
-      setUtilityMode(recommendedUtilityMode);
-    }
-  }, [inspectorOpen, recommendedUtilityMode]);
-
-  useLayoutEffect(() => {
-    const previousWorkspaceState = previousWorkspaceStateRef.current;
-
-    if (workspaceState !== previousWorkspaceState) {
-      setInspectorOpen((current) => {
-        if (isLiveRunWorkspaceState(workspaceState)) {
-          return false;
-        }
-
-        if (isResultsWorkspaceState(workspaceState)) {
-          return true;
-        }
-
-        return current;
-      });
-
-      if (isLiveRunWorkspaceState(workspaceState)) {
-        setWorkspaceSection("live-run");
-      } else if (isResultsWorkspaceState(workspaceState)) {
-        setWorkspaceSection("results");
-      }
+    if (isResultsWorkspaceState(workspaceState)) {
+      setPage("workspace");
     }
 
     previousWorkspaceStateRef.current = workspaceState;
   }, [workspaceState]);
-
-  useEffect(() => {
-    if (!repoPath.trim()) {
-      setSurface("project");
-    }
-  }, [repoPath]);
-
-  useEffect(() => {
-    if (surface === "project") {
-      setInspectorOpen(false);
-    }
-  }, [surface]);
 
   useEffect(() => {
     const terminalParent = terminalContainerRef.current;
@@ -548,8 +494,7 @@ export function App() {
       if (message.type === "status") {
         setStatus(message.payload);
         if (message.payload.active) {
-          setSurface("workspace");
-          setWorkspaceSection("live-run");
+          setPage("workspace");
           setSessionActivity((current) => ({
             startedAt: message.payload.startedAt ?? current.startedAt,
             lastActivityAt: current.lastActivityAt ?? message.payload.startedAt ?? new Date().toISOString(),
@@ -707,6 +652,7 @@ export function App() {
       const firstFailure = failedChecks[0];
       const detail = firstFailure?.message || "This project is not ready for a Codex session yet.";
       const nextStep = firstFailure?.recommendedAction ? `\nNext step: ${firstFailure.recommendedAction}` : "";
+      setPage("project");
       setError(`${detail}${nextStep}`);
       setSessionBanner((current) => reduceSessionBanner(current, { type: "error-received", detail }));
       return;
@@ -723,8 +669,7 @@ export function App() {
       failedAt: null
     });
     setSessionBanner((current) => reduceSessionBanner(current, { type: "start-requested", repoPath }));
-    setSurface("workspace");
-    setWorkspaceSection("live-run");
+    setPage("workspace");
     terminalRef.current?.clear();
     socketRef.current?.send(
       JSON.stringify({
@@ -818,9 +763,8 @@ export function App() {
 
     const document = payload as SavedPromptDocument;
     setPendingContextItems((current) => appendGeneratedDocumentItem(current, document));
-    setUtilityMode("context");
     if (!isLiveRunWorkspaceState(workspaceState)) {
-      setInspectorOpen(true);
+      setPage("context");
     }
     setPromptText((current) => {
       const separator = current.trim().length > 0 ? "\n" : "";
@@ -891,9 +835,8 @@ export function App() {
       setPendingContextItems((current) =>
         replaceUploadingItem(current, uploadId, createPendingContextItemFromAttachment(attachment))
       );
-      setUtilityMode("context");
       if (!isLiveRunWorkspaceState(workspaceState)) {
-        setInspectorOpen(true);
+        setPage("context");
       }
       if (attachment.kind === "zip") {
         setContextMessage(buildZipUploadSuccessMessage(attachment));
@@ -1081,7 +1024,7 @@ export function App() {
   const clearAllPendingContext = () => {
     setPendingContextItems(clearPendingContext());
     setContextMessage("Cleared all pending context for the next prompt.");
-    setUtilityMode("context");
+    setPage("context");
   };
 
   const copyItemRelativePath = async (relativePath: string) => {
@@ -1121,8 +1064,7 @@ export function App() {
     }));
     socketRef.current?.send(JSON.stringify({ type: "input", data: buildSubmittedPromptInput(composedPrompt) }));
     setSessionBanner((current) => reduceSessionBanner(current, { type: "prompt-submitted" }));
-    setSurface("workspace");
-    setWorkspaceSection("live-run");
+    setPage("workspace");
     terminalRef.current?.writeln(`\n[web prompt sent]\n${composedPrompt}\n`);
     setPromptText("");
     setPendingContextItems([]);
@@ -1139,8 +1081,7 @@ export function App() {
   };
 
   const viewTranscript = async (session: SessionHistoryItem) => {
-    setUtilityMode("transcript");
-    setInspectorOpen(true);
+    setPage("transcript");
     setTranscriptViewer({
       session,
       transcript: "",
@@ -1226,8 +1167,7 @@ export function App() {
       return;
     }
 
-    setUtilityMode("changes");
-    setInspectorOpen(true);
+    setPage("changes");
     setDiffViewer({
       diff: null,
       isLoading: true,
@@ -1277,7 +1217,6 @@ export function App() {
         onChangeView={setActiveView}
         sessionBanner={sessionBanner}
         sessionActivity={sessionActivity}
-        onDisconnect={stopSession}
         connectionStateLabel={formatConnectionState(connectionState)}
         hasActiveSession={status.active}
       />
@@ -1374,24 +1313,9 @@ export function App() {
             },
             formatDuration
           }}
-          surface={surface}
+          page={page}
           workspaceState={workspaceState}
-          workspaceSection={workspaceSection}
-          utilityMode={utilityMode}
-          inspectorOpen={inspectorOpen}
-          onSelectSurface={setSurface}
-          onSelectWorkspaceSection={(nextSection) => {
-            setSurface("workspace");
-            setWorkspaceSection(nextSection);
-          }}
-          onUtilityModeChange={setUtilityMode}
-          onInspectorOpen={(nextMode) => {
-            if (nextMode) {
-              setUtilityMode(nextMode);
-            }
-            setInspectorOpen(true);
-          }}
-          onInspectorClose={() => setInspectorOpen(false)}
+          onSelectPage={setPage}
           status={status}
           sessionBanner={sessionBanner}
           sessionActivity={sessionActivity}

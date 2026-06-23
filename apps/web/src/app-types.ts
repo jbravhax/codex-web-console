@@ -3,7 +3,9 @@ import type { PendingContextItem } from "./pending-context-types";
 import type { GitDiffSummary } from "./git-diff-viewer";
 import type { SessionBanner } from "./session-banner";
 import type { SessionExitPayload, SessionFailurePayload } from "./session-diagnostics";
-import type { AppSurface, UtilityMode, WorkspaceSection, WorkspaceState } from "./workflow-phase";
+import type { UtilityMode, WorkspaceState } from "./workflow-phase";
+
+export type ConsolePage = "workspace" | "project" | UtilityMode;
 
 export type ThemeSetting = "light" | "dark";
 
@@ -193,16 +195,9 @@ export type ConsoleViewProps = {
   composerPanel: ComposerPanelProps;
   repoInsightsPanel: RepoInsightsPanelProps;
   sessionHistoryPanel: SessionHistoryPanelProps;
-  surface: AppSurface;
+  page: ConsolePage;
   workspaceState: WorkspaceState;
-  workspaceSection: WorkspaceSection;
-  utilityMode: UtilityMode;
-  inspectorOpen: boolean;
-  onSelectSurface(nextSurface: AppSurface): void;
-  onSelectWorkspaceSection(nextSection: WorkspaceSection): void;
-  onUtilityModeChange(nextMode: UtilityMode): void;
-  onInspectorOpen(nextMode?: UtilityMode): void;
-  onInspectorClose(): void;
+  onSelectPage(nextPage: ConsolePage): void;
   status: SessionStatus;
   sessionBanner: SessionBanner;
   sessionActivity: SessionActivitySummary;
@@ -215,7 +210,6 @@ export type ConsoleHeaderProps = {
   onChangeView(nextView: "console" | "settings"): void;
   sessionBanner: SessionBanner;
   sessionActivity: SessionActivitySummary;
-  onDisconnect(): void;
   connectionStateLabel: string;
   hasActiveSession: boolean;
 };

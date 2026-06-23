@@ -251,30 +251,22 @@ function createDeferredPromise<T>() {
   return { promise, resolve };
 }
 
-function getInspectorLauncherButton(name: "Context" | "History" | "Transcript" | "Changes") {
-  const launcher = document.querySelector(".inspector-launcher");
-  if (!launcher) {
-    return undefined;
-  }
-
-  if (!(launcher instanceof HTMLElement)) {
-    return undefined;
-  }
-
-  return within(launcher).getByRole("button", { name });
+function getMenuButton(name: "Workspace" | "Project" | "Context" | "History" | "Transcript" | "Changes") {
+  const nav = screen.getByRole("navigation", { name: "Primary navigation" });
+  return within(nav).getByRole("button", {
+    name: (accessibleName) => accessibleName.trim().startsWith(name)
+  });
 }
 
-async function openInspectorMode(name: "Context" | "History" | "Transcript" | "Changes") {
-  const launcherButton = getInspectorLauncherButton(name);
-  if (!launcherButton) {
-    throw new Error(`Expected to find inspector launcher button for ${name}.`);
-  }
-
-  fireEvent.click(launcherButton);
-
+async function openMenuPage(name: "Context" | "History" | "Transcript" | "Changes" | "Project" | "Workspace") {
+  fireEvent.click(getMenuButton(name));
   await waitFor(() => {
-    expect(screen.getByRole("tab", { name }).getAttribute("aria-selected")).toBe("true");
+    expect(getMenuButton(name).className).toContain("selected");
   });
+}
+
+async function openProjectPage() {
+  await openMenuPage("Project");
 }
 
 beforeEach(() => {
@@ -299,10 +291,11 @@ describe("App integration", () => {
 
     renderApp();
 
-    fireEvent.click(screen.getByRole("button", { name: "Choose folder" }));
+    await openProjectPage();
+    fireEvent.click(screen.getByRole("button", { name: "Choose project" }));
 
     expect(await screen.findByText(REPO_PICKER_UNSUPPORTED_MESSAGE)).toBeTruthy();
-    expect(screen.getByText(/Use one real project folder/i)).toBeTruthy();
+    expect(screen.getByText(/Paste a full path or try the browser picker when it works/i)).toBeTruthy();
   });
 
   it("shows environment readiness details for the selected project", async () => {
@@ -329,14 +322,14 @@ describe("App integration", () => {
       }
     });
 
+    await openProjectPage();
     fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
         value: "/workspace/default-project"
       }
     });
-
-    expect(await screen.findByText("Environment readiness")).toBeTruthy();
-    const readinessSection = screen.getByText("Environment readiness").closest("section");
+    expect(await screen.findByText("Readiness")).toBeTruthy();
+    const readinessSection = screen.getByText("Readiness").closest("section");
     if (!readinessSection) {
       throw new Error("Expected readiness section.");
     }
@@ -349,6 +342,7 @@ describe("App integration", () => {
   it("creates a new project folder and reuses the chosen path for session start", async () => {
     renderApp();
 
+    await openProjectPage();
     fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
         value: "/workspace/new-project"
@@ -370,7 +364,9 @@ describe("App integration", () => {
   it("uses the left rail to switch between project and the unified workspace", async () => {
     const socket = renderApp();
 
-    expect(await screen.findByText("Choose a project")).toBeTruthy();
+    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
+    await openProjectPage();
+    expect(await screen.findByText("Project setup")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
         value: "/workspace/default-project"
@@ -379,23 +375,22 @@ describe("App integration", () => {
 
     expect(screen.queryByRole("button", { name: "Compose view" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Live run view" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Results view" })).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Workspace view" }));
+    fireEvent.click(getMenuButton("Workspace"));
     expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
-    expect(screen.queryByText("Choose a project")).toBeNull();
-    expect(await screen.findByText("Workspace status")).toBeTruthy();
+    expect(screen.queryByText("Project setup")).toBeNull();
+    expect(screen.getByLabelText("Workspace status")).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Project view" }));
-    expect(await screen.findByText("Choose a project")).toBeTruthy();
+    expect(await screen.findByText("Codex terminal")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Project" }));
+    expect(await screen.findByText("Project setup")).toBeTruthy();
   });
 
   it("walks the session banner through idle, starting, running, stopping, and stopped states", async () => {
     const socket = renderApp();
 
-    expect(await screen.findByText("Connected. Ready to start a Codex session.")).toBeTruthy();
+    expect(await screen.findByText("No session running")).toBeTruthy();
+    await openProjectPage();
 
     fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
@@ -403,7 +398,7 @@ describe("App integration", () => {
       }
     });
     fireEvent.click(screen.getByRole("button", { name: "Start session" }));
-    expect(await screen.findByText(/Starting Codex in \/workspace\/default-project/i)).toBeTruthy();
+    expect(await screen.findByText("Starting session")).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
     expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
@@ -440,6 +435,7 @@ describe("App integration", () => {
       }
     });
 
+    await openProjectPage();
     fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
         value: "/workspace/missing-project"
@@ -472,13 +468,13 @@ describe("App integration", () => {
       }
     });
 
+    await openProjectPage();
     fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
         value: "/workspace/Projects"
       }
     });
-
-    const readinessSection = screen.getByText("Environment readiness").closest("section");
+    const readinessSection = screen.getByText("Readiness").closest("section");
     if (!readinessSection) {
       throw new Error("Expected readiness section.");
     }
@@ -491,8 +487,8 @@ describe("App integration", () => {
   it("shows the generated prompt preview when expanded", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Workspace view" }));
+    expect(await screen.findByText("Codex terminal")).toBeTruthy();
+    fireEvent.click(getMenuButton("Workspace"));
     expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Prompt"), {
@@ -511,8 +507,8 @@ describe("App integration", () => {
   it("submits the prompt in one send action and shows waiting banner updates", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Workspace view" }));
+    expect(await screen.findByText("Codex terminal")).toBeTruthy();
+    fireEvent.click(getMenuButton("Workspace"));
     expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Prompt"), {
@@ -606,6 +602,7 @@ describe("App integration", () => {
       }
     });
 
+    await openProjectPage();
     fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
         value: "/workspace/existing-project"
@@ -626,6 +623,8 @@ describe("App integration", () => {
 
   it("keeps lower-frequency project setup tools collapsed until needed", async () => {
     renderApp();
+
+    await openProjectPage();
 
     expect(screen.queryByText("Initialize Git repository")).toBeNull();
     expect(screen.queryByText("No previous projects yet.")).toBeNull();
@@ -736,19 +735,19 @@ describe("App integration", () => {
   it("shows intentional empty states in each utility mode", async () => {
     renderApp();
 
-    await openInspectorMode("Context");
+    await openMenuPage("Context");
     expect(await screen.findByText("No context added yet. Start a session first.")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: "History" }));
+    await openMenuPage("History");
     await waitFor(() => {
       expect(screen.queryByText("Loading recent sessions...")).toBeNull();
     });
     expect(await screen.findByText("No previous sessions yet.")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Transcript" }));
+    await openMenuPage("Transcript");
     expect(await screen.findByText("Finish a session to review output.")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Changes" }));
+    await openMenuPage("Changes");
     expect(await screen.findByText("No changes yet. Start a session to inspect the project.")).toBeTruthy();
   });
 
@@ -765,7 +764,7 @@ describe("App integration", () => {
     });
 
     expect(await screen.findByText(/Saved 12,000 characters to \.codex-web\/documents\/pasted-20260621-120000\.md\./)).toBeTruthy();
-    await openInspectorMode("Context");
+    await openMenuPage("Context");
     expect(screen.getByText("Large pasted documents")).toBeTruthy();
     expect(screen.getByText(".codex-web/documents/pasted-20260621-120000.md")).toBeTruthy();
   });
@@ -801,7 +800,7 @@ describe("App integration", () => {
       }
     });
 
-    await openInspectorMode("Context");
+    await openMenuPage("Context");
     expect(await screen.findByText("Large pasted documents")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
@@ -836,14 +835,14 @@ describe("App integration", () => {
       }
     });
 
-    await openInspectorMode("History");
+    await openMenuPage("History");
     const transcriptButtons = await screen.findAllByRole("button", { name: "View transcript" });
 
     fireEvent.click(transcriptButtons[0]);
     expect(await screen.findByText("Loading transcript...")).toBeTruthy();
     expect(await screen.findByText("session transcript text")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: "History" }));
+    await openMenuPage("History");
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[1]);
     expect(await screen.findByText("Session transcript not found.")).toBeTruthy();
   });
@@ -865,12 +864,12 @@ describe("App integration", () => {
       }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Transcript" }));
+    await openMenuPage("Transcript");
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
     expect(await screen.findByRole("button", { name: "Download .txt" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Download raw" })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Transcript" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("button", { name: "Transcript" }).className).toContain("selected");
   });
 
   it("shows a fallback success message when copy uses the browser fallback", async () => {
@@ -895,7 +894,7 @@ describe("App integration", () => {
       }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Transcript" }));
+    await openMenuPage("Transcript");
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
     fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
@@ -926,7 +925,7 @@ describe("App integration", () => {
       }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Transcript" }));
+    await openMenuPage("Transcript");
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
     fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
@@ -946,9 +945,9 @@ describe("App integration", () => {
     emitSessionStatus(socket, true, "/workspace/default-project");
 
     await waitFor(() => {
-      expect(document.querySelector(".console-layout.workspace-view-live-run")).toBeTruthy();
+      expect(document.querySelector(".console-layout.page-workspace.workspace-state-running")).toBeTruthy();
     });
-    await openInspectorMode("Changes");
+    await openMenuPage("Changes");
     fireEvent.click(await screen.findByRole("button", { name: "Inspect changes" }));
     expect(await screen.findByText("Loading diff...")).toBeTruthy();
 
@@ -974,9 +973,9 @@ describe("App integration", () => {
     emitSessionStatus(socket, true, "/workspace/default-project");
 
     await waitFor(() => {
-      expect(document.querySelector(".console-layout.workspace-view-live-run")).toBeTruthy();
+      expect(document.querySelector(".console-layout.page-workspace.workspace-state-running")).toBeTruthy();
     });
-    await openInspectorMode("Changes");
+    await openMenuPage("Changes");
     fireEvent.click(await screen.findByRole("button", { name: "Inspect changes" }));
 
     const diffPanel = await screen.findByText((content, element) => {
@@ -989,19 +988,20 @@ describe("App integration", () => {
   it("keeps the inspector closed by default during compose and active live-run states", async () => {
     const socket = renderApp();
 
+    await openProjectPage();
     fireEvent.change(screen.getByLabelText("Project folder path"), {
       target: {
         value: "/workspace/default-project"
       }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Workspace view" }));
+    fireEvent.click(getMenuButton("Workspace"));
 
     expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
-    expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Context" })).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
-    expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
+    expect(await screen.findByText("Codex terminal")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Context" })).toBeTruthy();
 
     socket.emitMessage({
       type: "output",
@@ -1009,38 +1009,21 @@ describe("App integration", () => {
     });
 
     expect((await screen.findAllByText("Waiting for approval")).length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Context" })).toBeTruthy();
   });
 
   it("lets the user open and close inspector modes without leaving the workspace", async () => {
     const socket = renderApp();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect(await screen.findByText("Live Codex terminal")).toBeTruthy();
+    expect(await screen.findByText("Codex terminal")).toBeTruthy();
 
-    await openInspectorMode("Context");
-    expect(screen.getByRole("tab", { name: "Context" }).getAttribute("aria-selected")).toBe("true");
-
-    fireEvent.click(screen.getByRole("button", { name: "Transcript" }));
-    await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "Transcript" }).getAttribute("aria-selected")).toBe("true");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "History" }));
-    await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "History" }).getAttribute("aria-selected")).toBe("true");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Changes" }));
-    await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    await waitFor(() => {
-      expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
-    });
-    expect(screen.getByText("Live Codex terminal")).toBeTruthy();
+    await openMenuPage("Context");
+    await openMenuPage("Transcript");
+    await openMenuPage("History");
+    await openMenuPage("Changes");
+    await openMenuPage("Workspace");
+    expect(screen.getByText("Codex terminal")).toBeTruthy();
   });
 
   it("opens review affordances after completion and closes the inspector when returning to project setup", async () => {
@@ -1074,12 +1057,10 @@ describe("App integration", () => {
       }
     });
 
+    await openMenuPage("Workspace");
     expect((await screen.findAllByText("Results")).length).toBeGreaterThanOrEqual(1);
-    expect(await screen.findByRole("tablist", { name: "Utility panels" })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Project view" }));
-    expect(await screen.findByText("Choose a project")).toBeTruthy();
-    expect(screen.queryByRole("tablist", { name: "Utility panels" })).toBeNull();
+    await openMenuPage("Project");
+    expect(await screen.findByText("Project setup")).toBeTruthy();
   });
 
   it("uses utility tabs for progressive disclosure and shows a results summary after completion", async () => {
@@ -1100,14 +1081,10 @@ describe("App integration", () => {
     emitSessionStatus(socket, true, "/workspace/default-project");
 
     await waitFor(() => {
-      expect(document.querySelector(".console-layout.workspace-view-live-run")).toBeTruthy();
+      expect(document.querySelector(".console-layout.page-workspace.workspace-state-running")).toBeTruthy();
     });
-    await openInspectorMode("Changes");
-
-    fireEvent.click(screen.getByRole("tab", { name: "Context" }));
-    await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "Context" }).getAttribute("aria-selected")).toBe("true");
-    });
+    await openMenuPage("Changes");
+    await openMenuPage("Context");
 
     socket.emitMessage({
       type: "output",
