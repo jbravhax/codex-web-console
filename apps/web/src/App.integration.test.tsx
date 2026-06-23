@@ -336,7 +336,7 @@ describe("App integration", () => {
 
     fireEvent.click(within(readinessSection).getByRole("button", { name: "Show" }));
     expect(await screen.findByText("Git is not available on this machine right now.")).toBeTruthy();
-    expect(screen.getByText("Ready to start.")).toBeTruthy();
+    expect(screen.getByText("You can start this workspace.")).toBeTruthy();
   });
 
   it("creates a new project folder and reuses the chosen path for session start", async () => {

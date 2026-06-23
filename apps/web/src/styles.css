@@ -3545,14 +3545,57 @@ body {
 
 .project-health,
 .project-health-button {
-  padding: 0;
-  border: 0;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 0.35rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.55);
   box-shadow: none;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .project-health::before {
   display: none;
+}
+
+.project-health-passed,
+.status-pill-passed,
+.workspace-state-pill.status-pill-passed {
+  color: #15803d;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.22);
+}
+
+.project-health-warning,
+.status-pill-warning,
+.workspace-state-pill.status-pill-warning {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+.project-health-failed,
+.status-pill-failed,
+.workspace-state-pill.status-pill-failed {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.24);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.28rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .rail-action-dock {

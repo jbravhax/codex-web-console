@@ -134,9 +134,9 @@ function formatUtilityModeLabel(mode: "context" | "history" | "transcript" | "ch
 function formatWorkspaceStateLabel(workspaceState: ConsoleViewProps["workspaceState"]): string {
   switch (workspaceState) {
     case "idle":
-      return "Ready";
+      return "Idle";
     case "ready-to-compose":
-      return "Ready";
+      return "Compose";
     case "running":
       return "Running";
     case "awaiting-approval":
@@ -157,7 +157,7 @@ function formatWorkspaceStateLabel(workspaceState: ConsoleViewProps["workspaceSt
 function formatWorkspaceStateDetail(workspaceState: ConsoleViewProps["workspaceState"]): string {
   switch (workspaceState) {
     case "idle":
-      return "Open a project and start when ready.";
+      return "Open a project and start a session.";
     case "ready-to-compose":
       return "Write the task and queue any context.";
     case "running":
@@ -167,7 +167,7 @@ function formatWorkspaceStateDetail(workspaceState: ConsoleViewProps["workspaceS
     case "awaiting-input":
       return "Codex is waiting for your next instruction.";
     case "completed":
-      return "Review the output and continue when ready.";
+      return "Review the output and continue.";
     case "stopped":
       return "The session stopped before completion.";
     case "failed":
@@ -304,7 +304,7 @@ export function ConsoleHeader({
   const showRunningIndicator =
     sessionBanner.state === "running" || sessionBanner.state === "starting" || sessionBanner.state === "awaiting-approval";
   const showRoutineBanner = isExceptionalBannerState || sessionBanner.state === "completed" || sessionBanner.state === "stopped";
-  const serverLabel = connectionStateLabel === "Connected" ? "Local app ready" : connectionStateLabel;
+  const serverLabel = connectionStateLabel === "Connected" ? "Local app online" : connectionStateLabel;
   const sessionLabel = sessionBanner.state === "idle" ? "No session running" : sessionBanner.title;
 
   return (
@@ -429,10 +429,10 @@ function ProjectRail({
   ];
   const readinessLabel =
     readiness?.overallStatus === "failed"
-      ? "Needs attention"
+      ? "Failed"
       : readiness?.overallStatus === "warning"
-        ? "Review warnings"
-        : "All systems ready";
+        ? "Warning"
+        : "Passed";
   const readinessInteractive = Boolean(readiness && readiness.overallStatus !== "passed");
   const workspaceStatus = formatWorkspaceStateLabel(workspaceState);
 
@@ -528,10 +528,10 @@ export function ProjectControls({
     ? "Choose a project to check readiness."
     : readiness
       ? readiness.overallStatus === "passed"
-        ? "All systems ready"
+        ? "Passed"
         : readiness.overallStatus === "warning"
-          ? "Warnings to review"
-          : "Needs attention"
+          ? "Warning"
+          : "Failed"
       : "Check environment readiness.";
 
   return (
@@ -541,7 +541,7 @@ export function ProjectControls({
           <p className="section-kicker">Project</p>
           <h2>Project setup</h2>
         </div>
-        <span className="section-chip">{status.active ? "Session active" : "Ready to configure"}</span>
+        <span className="section-chip">{status.active ? "Session active" : "Setup"}</span>
       </div>
       <p className="helper-text project-workspace-summary">
         Pick the exact folder you want Codex to work in.
@@ -561,86 +561,6 @@ export function ProjectControls({
       </div>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
       <p className="helper-text project-path-guidance">Paste a full path or try the browser picker when it works.</p>
-      <CollapsibleSection
-        title="Recent projects"
-        subtitle={
-          isLoadingRecentProjects
-            ? "Loading recent projects..."
-            : recentProjects.length === 0
-              ? undefined
-              : `${recentProjects.length} saved project${recentProjects.length === 1 ? "" : "s"} ready to reuse.`
-        }
-        className="collapsible-section-secondary"
-      >
-        <div className="recent-projects">
-          {recentProjects.length > 0 ? (
-            <div className="recent-project-list">
-              {recentProjects.map((project) => (
-                <button
-                  key={project.repoPath}
-                  type="button"
-                  className={`recent-project-chip ${project.available ? "" : "unavailable"}`}
-                  onClick={() => onRepoPathChange(project.repoPath)}
-                  disabled={!project.available}
-                >
-                  <span className="recent-project-path">{project.repoPath}</span>
-                  <span className="recent-project-meta">
-                    {project.available ? `${project.openCount} open${project.openCount === 1 ? "" : "s"}` : "Unavailable"}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="helper-text recent-projects-empty">No previous projects yet.</p>
-          )}
-        </div>
-      </CollapsibleSection>
-      <CollapsibleSection
-        title="Readiness"
-        subtitle={readinessSummary}
-        defaultExpanded={readinessHasWarningsOrFailures}
-        className={readiness?.overallStatus === "passed" ? "collapsible-section-quiet readiness-collapsible" : "readiness-collapsible"}
-      >
-        <div className="readiness-card">
-          <div className="readiness-card-header">
-            <div>
-              <strong>Before you start</strong>
-              <p className="helper-text collapsible-section-subtitle">
-                {isLoadingSettings ? "Loading default project root..." : defaultRepoRoot || "Choose a folder"}
-              </p>
-            </div>
-            <button type="button" className="ghost" onClick={onRefreshReadiness} disabled={!repoPath.trim() || isLoadingReadiness}>
-              {isLoadingReadiness ? "Checking..." : "Refresh"}
-            </button>
-          </div>
-          {!repoPath.trim() ? (
-            <p className="helper-text">Choose a project folder to run readiness checks.</p>
-          ) : isLoadingReadiness ? (
-            <p className="helper-text">Checking Codex, Git, access, and sandbox readiness...</p>
-          ) : readiness ? (
-            <>
-              <div className={`readiness-overall readiness-${readiness.overallStatus}`}>
-                <strong>{formatReadinessStatusLabel(readiness.overallStatus)}</strong>
-                <span>{readiness.canStart ? "Ready to start." : "Fix the failed items before starting."}</span>
-              </div>
-              <div className="readiness-list">
-                {readiness.items.map((item) => (
-                  <article key={item.key} className={`readiness-item readiness-${item.status}`}>
-                    <div className="readiness-item-header">
-                      <strong>{item.message}</strong>
-                      <span className="section-chip">{formatReadinessStatusLabel(item.status)}</span>
-                    </div>
-                    <p className="helper-text">{item.recommendedAction}</p>
-                  </article>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="helper-text">Could not run readiness checks yet. Refresh after choosing a project folder.</p>
-          )}
-          <p className="helper-text readiness-footnote">Server: {connectionStateLabel}</p>
-        </div>
-      </CollapsibleSection>
       <div className="project-secondary-sections">
         <CollapsibleSection
           title="Create new project"
@@ -699,7 +619,87 @@ export function ProjectControls({
             {projectMessage ? <p className="success-banner compact-success">{projectMessage}</p> : null}
           </div>
         </CollapsibleSection>
+        <CollapsibleSection
+          title="Recent projects"
+          subtitle={
+            isLoadingRecentProjects
+              ? "Loading recent projects..."
+              : recentProjects.length === 0
+                ? undefined
+                : `${recentProjects.length} saved project${recentProjects.length === 1 ? "" : "s"}.`
+          }
+          className="collapsible-section-secondary"
+        >
+          <div className="recent-projects">
+            {recentProjects.length > 0 ? (
+              <div className="recent-project-list">
+                {recentProjects.map((project) => (
+                  <button
+                    key={project.repoPath}
+                    type="button"
+                    className={`recent-project-chip ${project.available ? "" : "unavailable"}`}
+                    onClick={() => onRepoPathChange(project.repoPath)}
+                    disabled={!project.available}
+                  >
+                    <span className="recent-project-path">{project.repoPath}</span>
+                    <span className="recent-project-meta">
+                      {project.available ? `${project.openCount} open${project.openCount === 1 ? "" : "s"}` : "Unavailable"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="helper-text recent-projects-empty">No previous projects yet.</p>
+            )}
+          </div>
+        </CollapsibleSection>
       </div>
+      <CollapsibleSection
+        title="Readiness"
+        subtitle={readinessSummary}
+        defaultExpanded={readinessHasWarningsOrFailures}
+        className={readiness?.overallStatus === "passed" ? "collapsible-section-quiet readiness-collapsible" : "readiness-collapsible"}
+      >
+        <div className="readiness-card">
+          <div className="readiness-card-header">
+            <div>
+              <strong>Before you start</strong>
+              <p className="helper-text collapsible-section-subtitle">
+                {isLoadingSettings ? "Loading default project root..." : defaultRepoRoot || "Choose a folder"}
+              </p>
+            </div>
+            <button type="button" className="ghost" onClick={onRefreshReadiness} disabled={!repoPath.trim() || isLoadingReadiness}>
+              {isLoadingReadiness ? "Checking..." : "Refresh"}
+            </button>
+          </div>
+          {!repoPath.trim() ? (
+            <p className="helper-text">Choose a project folder to run readiness checks.</p>
+          ) : isLoadingReadiness ? (
+            <p className="helper-text">Checking Codex, Git, access, and sandbox readiness...</p>
+          ) : readiness ? (
+            <>
+              <div className={`readiness-overall readiness-${readiness.overallStatus}`}>
+                <span className={`status-pill status-pill-${readiness.overallStatus}`}>{formatReadinessStatusLabel(readiness.overallStatus)}</span>
+                <span>{readiness.canStart ? "You can start this workspace." : "Fix the failed items before starting."}</span>
+              </div>
+              <div className="readiness-list">
+                {readiness.items.map((item) => (
+                  <article key={item.key} className={`readiness-item readiness-${item.status}`}>
+                    <div className="readiness-item-header">
+                      <strong>{item.message}</strong>
+                      <span className={`status-pill status-pill-${item.status}`}>{formatReadinessStatusLabel(item.status)}</span>
+                    </div>
+                    <p className="helper-text">{item.recommendedAction}</p>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="helper-text">Could not run readiness checks yet. Refresh after choosing a project folder.</p>
+          )}
+          <p className="helper-text readiness-footnote">Server: {connectionStateLabel}</p>
+        </div>
+      </CollapsibleSection>
     </section>
   );
 }
@@ -1475,9 +1475,23 @@ export function ConsoleView({
             <section className="workspace-page-header">
               <div>
                 <p className="section-kicker">Workspace</p>
-                <h2>{status.active ? "Live workspace" : "Ready workspace"}</h2>
+                <h2>{status.active ? "Live workspace" : "Workspace"}</h2>
               </div>
-              <span className="section-chip">{formatWorkspaceStateLabel(workspaceState)}</span>
+              <span
+                className={`section-chip workspace-state-pill ${
+                  !status.active && projectControls.readiness?.overallStatus
+                    ? `status-pill-${projectControls.readiness.overallStatus}`
+                    : ""
+                }`.trim()}
+              >
+                {!status.active && projectControls.readiness?.overallStatus === "passed"
+                  ? "Ready"
+                  : !status.active && projectControls.readiness?.overallStatus === "failed"
+                    ? "Failed"
+                    : !status.active && projectControls.readiness?.overallStatus === "warning"
+                      ? "Warning"
+                      : formatWorkspaceStateLabel(workspaceState)}
+              </span>
             </section>
 
             {terminalFirst ? (
