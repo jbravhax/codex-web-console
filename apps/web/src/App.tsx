@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { createPastedImageFileName, isSupportedAttachmentName } from "./attachments";
@@ -97,6 +97,8 @@ const DEFAULT_CREATE_PROJECT_OPTIONS: CreateProjectOptions = {
   createReadme: true
 };
 
+const INITIAL_TERMINAL_TEXT = "Codex CLI Web Console\r\nEnter one real project folder path and start a session.\r\n\r\n";
+
 function formatDuration(durationMs: number | null): string {
   if (durationMs === null) {
     return "In progress";
@@ -126,7 +128,6 @@ function formatConnectionState(state: "connecting" | "connected" | "disconnected
 }
 
 export function App() {
-  const terminalContainerRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -136,6 +137,8 @@ export function App() {
   const sessionBannerRef = useRef<SessionBanner>(createInitialSessionBanner());
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const previousWorkspaceStateRef = useRef<WorkspaceState>("idle");
+  const terminalBufferRef = useRef(INITIAL_TERMINAL_TEXT);
+  const [terminalHostElement, setTerminalHostElement] = useState<HTMLDivElement | null>(null);
   const [activeView, setActiveView] = useState<"console" | "settings">("console");
   const [repoPath, setRepoPath] = useState("");
   const [promptText, setPromptText] = useState("");
@@ -217,6 +220,27 @@ export function App() {
     setError(buildCopyFailureMessage(subject, copyError));
   };
 
+  const setTerminalContainerRef = useCallback((node: HTMLDivElement | null) => {
+    setTerminalHostElement(node);
+  }, []);
+
+  const writeToTerminal = useCallback((text: string) => {
+    terminalBufferRef.current += text;
+    terminalRef.current?.write(text);
+  }, []);
+
+  const writeTerminalLine = useCallback((text: string) => {
+    writeToTerminal(`${text}\r\n`);
+  }, [writeToTerminal]);
+
+  const resetTerminalBuffer = useCallback((text = "") => {
+    terminalBufferRef.current = text;
+    terminalRef.current?.clear();
+    if (text) {
+      terminalRef.current?.write(text);
+    }
+  }, []);
+
   const runReadinessChecks = async (pathToCheck: string) => {
     const normalizedPath = pathToCheck.trim();
     if (!normalizedPath) {
@@ -274,7 +298,7 @@ export function App() {
   }, [workspaceState]);
 
   useEffect(() => {
-    const terminalParent = terminalContainerRef.current;
+    const terminalParent = terminalHostElement;
     if (!terminalParent) {
       return;
     }
@@ -293,9 +317,9 @@ export function App() {
     terminal.loadAddon(fitAddon);
     terminal.open(terminalParent);
     fitAddon.fit();
-    terminal.writeln("Codex CLI Web Console");
-    terminal.writeln("Enter one real project folder path and start a session.");
-    terminal.writeln("");
+    if (terminalBufferRef.current) {
+      terminal.write(terminalBufferRef.current);
+    }
 
     terminal.onData((data) => {
       if (statusRef.current.active) {
@@ -314,6 +338,7 @@ export function App() {
       }
     };
 
+    resizeObserverRef.current?.disconnect();
     resizeObserverRef.current = new ResizeObserver(handleResize);
     resizeObserverRef.current.observe(terminalParent);
     window.addEventListener("resize", handleResize);
@@ -326,9 +351,15 @@ export function App() {
     return () => {
       resizeObserverRef.current?.disconnect();
       window.removeEventListener("resize", handleResize);
+      if (terminalRef.current === terminal) {
+        terminalRef.current = null;
+      }
+      if (fitAddonRef.current === fitAddon) {
+        fitAddonRef.current = null;
+      }
       terminal.dispose();
     };
-  }, []);
+  }, [terminalHostElement]);
 
   useEffect(() => {
     void fetch("/api/settings")
@@ -520,7 +551,7 @@ export function App() {
       }
 
       if (message.type === "output") {
-        terminalRef.current?.write(message.payload);
+        writeToTerminal(message.payload);
         const outputState = detectTerminalOutputState(message.payload);
         const activityTimestamp = new Date().toISOString();
         setSessionActivity((current) => ({
@@ -572,8 +603,8 @@ export function App() {
           })
         );
         setPendingContextItems([]);
-        terminalRef.current?.writeln("");
-        terminalRef.current?.writeln(
+        writeTerminalLine("");
+        writeTerminalLine(
           `[session ended: exit ${message.payload.exitCode}, signal ${message.payload.signal}${
             message.payload.startedAt ? `, started ${message.payload.startedAt}` : ""
           }${message.payload.endedAt ? `, ended ${message.payload.endedAt}` : ""}]`
@@ -603,8 +634,8 @@ export function App() {
           failedAt: failureTimestamp,
           disconnectedAt: null
         }));
-        terminalRef.current?.writeln("");
-        terminalRef.current?.writeln(
+        writeTerminalLine("");
+        writeTerminalLine(
           `[error] ${typeof message.payload === "string" ? message.payload : message.payload.technicalDetail}`
         );
       }
@@ -636,7 +667,7 @@ export function App() {
     return () => {
       socket.close();
     };
-  }, []);
+  }, [writeTerminalLine, writeToTerminal]);
 
   const startSession = async () => {
     if (socketRef.current?.readyState !== WebSocket.OPEN) {
@@ -670,7 +701,7 @@ export function App() {
     });
     setSessionBanner((current) => reduceSessionBanner(current, { type: "start-requested", repoPath }));
     setPage("workspace");
-    terminalRef.current?.clear();
+    resetTerminalBuffer();
     socketRef.current?.send(
       JSON.stringify({
         type: "start",
@@ -1070,7 +1101,10 @@ export function App() {
     }, 20);
     setSessionBanner((current) => reduceSessionBanner(current, { type: "prompt-submitted" }));
     setPage("workspace");
-    terminalRef.current?.writeln(`\n[web prompt sent]\n${composedPrompt}\n`);
+    writeTerminalLine("");
+    writeTerminalLine("[web prompt sent]");
+    writeTerminalLine(composedPrompt);
+    writeTerminalLine("");
     setPromptText("");
     setPendingContextItems([]);
     promptInputRef.current?.focus();
@@ -1325,7 +1359,7 @@ export function App() {
           sessionBanner={sessionBanner}
           sessionActivity={sessionActivity}
           latestSession={latestSession}
-          terminalContainerRef={terminalContainerRef}
+          terminalContainerRef={setTerminalContainerRef}
         />
       ) : (
         <section className="settings-section">

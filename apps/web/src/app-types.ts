@@ -202,7 +202,7 @@ export type ConsoleViewProps = {
   sessionBanner: SessionBanner;
   sessionActivity: SessionActivitySummary;
   latestSession: SessionHistoryItem | null;
-  terminalContainerRef: React.RefObject<HTMLDivElement | null>;
+  terminalContainerRef: React.RefCallback<HTMLDivElement>;
 };
 
 export type ConsoleHeaderProps = {

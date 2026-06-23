@@ -12,7 +12,7 @@ import type {
 } from "./app-types";
 import type { PendingContextItem } from "./pending-context-types";
 import { formatSessionBannerStateLabel, type SessionBanner } from "./session-banner";
-import { isLiveRunWorkspaceState, isResultsWorkspaceState } from "./workflow-phase";
+import { isResultsWorkspaceState } from "./workflow-phase";
 
 type PendingContextGroup = {
   key: PendingContextItem["kind"];
@@ -1425,7 +1425,6 @@ export function ConsoleView({
   const showProjectPage = page === "project";
   const showWorkspacePage = page === "workspace";
   const showReviewPage = isReviewPage(page);
-  const terminalFirst = isLiveRunWorkspaceState(workspaceState) || isResultsWorkspaceState(workspaceState);
 
   const reviewContent = (() => {
     if (page === "context") {
@@ -1470,8 +1469,10 @@ export function ConsoleView({
       <main className="workspace-main workspace-page-shell">
         {showProjectPage ? <ProjectControls {...projectControls} /> : null}
 
-        {showWorkspacePage ? (
-          <>
+        <section
+          className={`workspace-surface ${showWorkspacePage ? "" : "workspace-surface-hidden"}`.trim()}
+          aria-hidden={!showWorkspacePage}
+        >
             <section className="workspace-page-header">
               <div>
                 <p className="section-kicker">Workspace</p>
@@ -1493,7 +1494,7 @@ export function ConsoleView({
                       : formatWorkspaceStateLabel(workspaceState)}
               </span>
             </section>
-            <div className={`workspace-content-stack ${terminalFirst ? "terminal-first" : "composer-first"}`}>
+            <div className="workspace-content-stack terminal-first">
               <div className="workspace-region workspace-region-composer">
                 <ComposerPanel {...composerPanel} />
               </div>
@@ -1529,11 +1530,9 @@ export function ConsoleView({
                 </div>
               </section>
 
-              {showWorkspacePage ? (
-                <div className="workspace-region workspace-region-approval">
-                  <ApprovalActionStrip sessionBanner={sessionBanner} />
-                </div>
-              ) : null}
+              <div className="workspace-region workspace-region-approval">
+                <ApprovalActionStrip sessionBanner={sessionBanner} />
+              </div>
 
               {showResultsSummary ? (
                 <div className="workspace-region workspace-region-results">
@@ -1557,8 +1556,7 @@ export function ConsoleView({
                 </div>
               ) : null}
             </div>
-          </>
-        ) : null}
+        </section>
 
         {showReviewPage ? (
           <section className="review-page">
