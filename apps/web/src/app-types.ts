@@ -3,6 +3,7 @@ import type { PendingContextItem } from "./pending-context-types";
 import type { GitDiffSummary } from "./git-diff-viewer";
 import type { SessionBanner } from "./session-banner";
 import type { SessionExitPayload, SessionFailurePayload } from "./session-diagnostics";
+import type { UtilityMode, WorkflowPhase } from "./workflow-phase";
 
 export type ThemeSetting = "light" | "dark";
 
@@ -178,6 +179,7 @@ export type SessionHistoryPanelProps = {
   sessions: SessionHistoryItem[];
   isLoadingSessions: boolean;
   transcriptViewer: TranscriptViewerState;
+  showTranscriptViewer?: boolean;
   onViewTranscript(session: SessionHistoryItem): void;
   onCopyTranscript(): void;
   onDownloadTranscriptText(): void;
@@ -192,9 +194,13 @@ export type ConsoleViewProps = {
   composerPanel: ComposerPanelProps;
   repoInsightsPanel: RepoInsightsPanelProps;
   sessionHistoryPanel: SessionHistoryPanelProps;
+  workflowPhase: WorkflowPhase;
+  utilityMode: UtilityMode;
+  onUtilityModeChange(nextMode: UtilityMode): void;
   status: SessionStatus;
   sessionBanner: SessionBanner;
   sessionActivity: SessionActivitySummary;
+  latestSession: SessionHistoryItem | null;
   terminalContainerRef: React.RefObject<HTMLDivElement | null>;
 };
 

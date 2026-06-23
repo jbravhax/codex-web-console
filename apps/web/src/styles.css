@@ -1121,7 +1121,7 @@ textarea {
 
 .console-layout {
   display: grid;
-  grid-template-columns: 288px minmax(0, 1fr) 328px;
+  grid-template-columns: 280px minmax(0, 1fr) 336px;
   gap: 1.25rem;
   align-items: start;
 }
@@ -1239,11 +1239,6 @@ textarea {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.context-card {
-  position: sticky;
-  top: 1.25rem;
-}
-
 .workspace-card .helper-text,
 .rail-card .helper-text {
   line-height: 1.5;
@@ -1285,6 +1280,30 @@ textarea {
   min-height: 0;
 }
 
+.workflow-live-run .terminal-section {
+  order: 1;
+}
+
+.workflow-live-run .composer-card {
+  order: 2;
+}
+
+.workflow-live-run .terminal-panel {
+  height: 70vh;
+}
+
+.workflow-results .results-summary-card {
+  order: 1;
+}
+
+.workflow-results .terminal-section {
+  order: 2;
+}
+
+.workflow-results .composer-card {
+  order: 3;
+}
+
 .terminal-stage-header,
 .composer-header {
   display: flex;
@@ -1319,6 +1338,10 @@ textarea {
   display: grid;
   justify-items: end;
   gap: 0.45rem;
+}
+
+.workflow-phase-chip {
+  opacity: 0.78;
 }
 
 .terminal-stage-attention .terminal-panel,
@@ -1400,6 +1423,52 @@ textarea {
   padding: 1.25rem;
 }
 
+.utility-rail {
+  position: sticky;
+  top: 1.25rem;
+}
+
+.utility-panel {
+  padding: 1rem;
+}
+
+.utility-panel-heading {
+  margin-bottom: 0.85rem;
+}
+
+.utility-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.utility-tab {
+  min-height: 42px;
+  padding: 0.7rem 0.85rem;
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--panel-border);
+}
+
+.utility-tab.active {
+  background: var(--secondary-bg);
+  color: var(--text);
+}
+
+.utility-panel-body {
+  min-height: 0;
+}
+
+.utility-surface {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .git-stats {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1412,6 +1481,7 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .history-list {
@@ -1437,6 +1507,53 @@ textarea {
 
 .settings-section {
   padding: 1.5rem;
+}
+
+.results-summary-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.35rem;
+}
+
+.results-summary-copy,
+.results-next-step {
+  margin: 0;
+}
+
+.results-summary-copy {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.results-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.results-summary-status-list,
+.results-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.summary-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.summary-pill.ready {
+  border-color: rgba(52, 211, 153, 0.3);
+  color: var(--success);
+}
+
+.summary-pill.muted {
+  color: var(--muted);
 }
 
 /* Feedback */
@@ -1468,7 +1585,7 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .context-card {
+  .utility-rail {
     position: static;
   }
 
@@ -1523,6 +1640,11 @@ textarea {
   .terminal-panel {
     height: 55vh;
     min-height: 320px;
+  }
+
+  .utility-mode-tabs,
+  .results-summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .git-stats,

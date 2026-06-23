@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import * as clipboardModule from "./clipboard";
@@ -276,7 +276,7 @@ describe("App integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choose folder" }));
 
     expect(await screen.findByText(REPO_PICKER_UNSUPPORTED_MESSAGE)).toBeTruthy();
-    expect(screen.getByText(/Paste one specific project folder path/i)).toBeTruthy();
+    expect(screen.getByText(/Paste one specific project path/i)).toBeTruthy();
   });
 
   it("shows environment readiness details for the selected project", async () => {
@@ -369,7 +369,7 @@ describe("App integration", () => {
       }
     });
 
-    expect(await screen.findByText("Session stopped")).toBeTruthy();
+    expect((await screen.findAllByText("Session stopped")).length).toBeGreaterThanOrEqual(1);
   });
 
   it("blocks session start when readiness reports a hard failure", async () => {
@@ -505,12 +505,12 @@ describe("App integration", () => {
       type: "output",
       payload: "Created only README.md.\n\n─ Worked for 1m 23s ─"
     });
-    expect(await screen.findByText("Request completed")).toBeTruthy();
-    expect(await screen.findByText("Completed at")).toBeTruthy();
+    expect((await screen.findAllByText("Request completed")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Completed at")).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/send another prompt when you're ready/i).length).toBeGreaterThan(0);
 
     socket.emitClose({ code: 1006, reason: "server stopped" });
-    expect(await screen.findByText("Disconnected")).toBeTruthy();
+    expect((await screen.findAllByText("Disconnected")).length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText("Disconnected at")).toBeTruthy();
     expect(
       (
@@ -572,7 +572,7 @@ describe("App integration", () => {
     renderApp();
 
     expect(screen.queryByText("Initialize Git repository")).toBeNull();
-    expect(screen.queryByText("Open a project once and it will appear here for quick reuse.")).toBeNull();
+    expect(screen.queryByText("Projects you open will appear here.")).toBeNull();
 
     const createProjectSection = screen.getByText("Create new project").closest("section");
     if (!createProjectSection) {
@@ -588,7 +588,7 @@ describe("App integration", () => {
     }
 
     fireEvent.click(within(recentProjectsSection).getByRole("button", { name: "Show" }));
-    expect(await screen.findByText("Open a project once and it will appear here for quick reuse.")).toBeTruthy();
+    expect(await screen.findByText("Projects you open will appear here.")).toBeTruthy();
   });
 
   it("shows clear guidance when the selected folder looks like a broad parent directory", async () => {
@@ -642,7 +642,7 @@ describe("App integration", () => {
       }
     });
 
-    expect(await screen.findByText("Session failed")).toBeTruthy();
+    expect((await screen.findAllByText("Session failed")).length).toBeGreaterThanOrEqual(1);
     expect((await screen.findAllByText(/could not finish starting its linux sandbox/i)).length).toBeGreaterThanOrEqual(1);
   });
 
@@ -661,9 +661,9 @@ describe("App integration", () => {
       }
     });
 
-    expect(await screen.findByText("Session completed")).toBeTruthy();
-    expect(await screen.findByText("Completed at")).toBeTruthy();
-    expect(await screen.findByText("Last activity")).toBeTruthy();
+    expect((await screen.findAllByText("Session completed")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Completed at")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Last activity")).length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows an empty preview state when nothing is queued", async () => {
@@ -765,11 +765,12 @@ describe("App integration", () => {
     expect(await screen.findByText("Loading transcript...")).toBeTruthy();
     expect(await screen.findByText("session transcript text")).toBeTruthy();
 
-    fireEvent.click(transcriptButtons[1]);
+    fireEvent.click(screen.getByRole("tab", { name: "History" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[1]);
     expect(await screen.findByText("Session transcript not found.")).toBeTruthy();
   });
 
-  it("keeps transcript export actions available without leaving them always expanded", async () => {
+  it("keeps transcript export actions available inside the focused transcript mode", async () => {
     vi.mocked(loadSessionTranscript).mockResolvedValueOnce("session transcript text");
 
     renderApp({
@@ -788,17 +789,9 @@ describe("App integration", () => {
 
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
-
-    expect(screen.queryByRole("button", { name: "Download .txt" })).toBeNull();
-
-    const transcriptToolsSection = screen.getByText("Transcript tools").closest("section");
-    if (!transcriptToolsSection) {
-      throw new Error("Expected transcript tools section.");
-    }
-
-    fireEvent.click(within(transcriptToolsSection).getByRole("button", { name: "Show" }));
     expect(await screen.findByRole("button", { name: "Download .txt" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Download raw" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Transcript" }).getAttribute("aria-selected")).toBe("true");
   });
 
   it("shows a fallback success message when copy uses the browser fallback", async () => {
@@ -825,13 +818,6 @@ describe("App integration", () => {
 
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
-
-    const transcriptToolsSection = screen.getByText("Transcript tools").closest("section");
-    if (!transcriptToolsSection) {
-      throw new Error("Expected transcript tools section.");
-    }
-
-    fireEvent.click(within(transcriptToolsSection).getByRole("button", { name: "Show" }));
     fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
 
     expect(
@@ -862,13 +848,6 @@ describe("App integration", () => {
 
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[0]);
     await screen.findByText("session transcript text");
-
-    const transcriptToolsSection = screen.getByText("Transcript tools").closest("section");
-    if (!transcriptToolsSection) {
-      throw new Error("Expected transcript tools section.");
-    }
-
-    fireEvent.click(within(transcriptToolsSection).getByRole("button", { name: "Show" }));
     fireEvent.click(screen.getByRole("button", { name: "Copy transcript" }));
 
     expect(
@@ -916,5 +895,39 @@ describe("App integration", () => {
     });
 
     expect(diffPanel.textContent).toContain("=== Unstaged changes ===");
+  });
+
+  it("uses utility tabs for progressive disclosure and shows a results summary after completion", async () => {
+    const socket = renderApp({
+      sessions: {
+        items: [
+          {
+            id: "session-1",
+            repoPath: "/workspace/default-project",
+            startTime: "2026-06-22T21:10:00.000Z",
+            endTime: "2026-06-22T21:12:00.000Z",
+            durationMs: 120000
+          }
+        ]
+      }
+    });
+
+    emitSessionStatus(socket, true, "/workspace/default-project");
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true");
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Context" }));
+    expect(await screen.findByText("Ready context")).toBeTruthy();
+
+    socket.emitMessage({
+      type: "output",
+      payload: "Created only README.md.\n\nâ”€ Worked for 1m 23s â”€"
+    });
+
+    expect((await screen.findAllByText("Results")).length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText("Transcript available")).toBeTruthy();
+    expect(await screen.findByText("Open transcript")).toBeTruthy();
   });
 });

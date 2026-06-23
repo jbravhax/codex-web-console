@@ -116,6 +116,68 @@ function buildSessionMomentRows(
   return rows;
 }
 
+function formatWorkflowPhaseLabel(phase: ConsoleViewProps["workflowPhase"]): string {
+  switch (phase) {
+    case "project":
+      return "Project";
+    case "compose":
+      return "Compose";
+    case "live-run":
+      return "Live Run";
+    case "results":
+      return "Results";
+  }
+}
+
+function formatUtilityModeLabel(mode: ConsoleViewProps["utilityMode"]): string {
+  switch (mode) {
+    case "context":
+      return "Context";
+    case "history":
+      return "History";
+    case "transcript":
+      return "Transcript";
+    case "changes":
+      return "Changes";
+  }
+}
+
+function getSuggestedNextAction(sessionBanner: SessionBanner): string {
+  switch (sessionBanner.state) {
+    case "completed":
+      return "Review the transcript or inspect repo changes, then send the next prompt when you are ready.";
+    case "failed":
+      return "Review the failure details and transcript, then start a fresh session once the issue is fixed.";
+    case "disconnected":
+      return "Reconnect to the local server and start a fresh session because live reattach is not available yet.";
+    case "stopped":
+      return "Review what happened in the transcript, then start a new session when you want to continue.";
+    default:
+      return "Review the session output, then choose the next action from the utility panel.";
+  }
+}
+
+function formatElapsedDuration(startedAt: string | null, endedAt: string | null): string | null {
+  if (!startedAt || !endedAt) {
+    return null;
+  }
+
+  const durationMs = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    return null;
+  }
+
+  const totalSeconds = Math.round(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes === 0) {
+    return `${seconds}s`;
+  }
+
+  return `${minutes}m ${seconds}s`;
+}
+
 type CollapsibleSectionProps = {
   title: string;
   subtitle?: string;
@@ -253,7 +315,7 @@ export function ProjectControls({
         </button>
       </div>
       <p className="helper-text">
-        Paste one specific project folder path. Use the browser picker only when it can share a usable path.
+        Paste one specific project path. Use the picker only when it can provide a usable folder path.
       </p>
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
       <CollapsibleSection title="Environment readiness" subtitle={readinessSummary}>
@@ -322,7 +384,7 @@ export function ProjectControls({
           isLoadingRecentProjects
             ? "Loading recent projects..."
             : recentProjects.length === 0
-              ? "Open a project once and it will appear here for quick reuse."
+              ? "Projects you open will appear here."
               : `${recentProjects.length} recent project${recentProjects.length === 1 ? "" : "s"} available.`
         }
       >
@@ -421,7 +483,7 @@ export function PendingContextPanel({
   const groupedItems = groupPendingContextItems(pendingContextItems);
 
   return (
-    <section className="rail-card context-card">
+    <section className="context-card utility-surface">
       <div className="section-heading">
         <div>
           <p className="section-kicker">Context</p>
@@ -586,9 +648,7 @@ export function ComposerPanel({
         <div>
           <p className="section-kicker">Prompt</p>
           <h2>Guide Codex intentionally</h2>
-          <p className="helper-text">
-            Write the task, attach context when needed, and send it when you're ready.
-          </p>
+          <p className="helper-text">Write the task, add context if needed, and send it when you are ready.</p>
           {terminalGuidance ? <p className="helper-text composer-guidance">{terminalGuidance}</p> : null}
         </div>
         <div className="attachment-actions">
@@ -629,7 +689,7 @@ export function ComposerPanel({
           <div>
             <strong>What Codex will receive</strong>
             {isPromptPreviewExpanded ? (
-              <p className="helper-text">This is the exact generated prompt that will be sent, including saved context references.</p>
+              <p className="helper-text">This is the exact prompt that will be sent, including saved context references.</p>
             ) : null}
           </div>
           <div className="prompt-preview-actions">
@@ -697,11 +757,11 @@ export function RepoInsightsPanel({
   const hasDiffState = diffViewer.isLoading || Boolean(diffViewer.error) || Boolean(diffViewer.diff) || Boolean(diffEmptyState);
 
   return (
-    <section className="git-section rail-card">
+    <section className="git-section utility-surface">
       <div className="section-heading">
         <div>
           <p className="section-kicker">Repository</p>
-          <h2>Repo insights</h2>
+          <h2>Changes</h2>
         </div>
         <span className="section-chip">{status.active ? "Live" : "Idle"}</span>
       </div>
@@ -712,7 +772,7 @@ export function RepoInsightsPanel({
           </button>
         </div>
       ) : null}
-      {!status.active ? <p className="git-empty">Start a session to see repo status.</p> : null}
+      {!status.active ? <p className="git-empty">Start a session to inspect repo changes.</p> : null}
       {status.active ? (
         <CollapsibleSection
           title="Repo details"
@@ -778,6 +838,7 @@ export function SessionHistoryPanel({
   sessions,
   isLoadingSessions,
   transcriptViewer,
+  showTranscriptViewer = true,
   onViewTranscript,
   onCopyTranscript,
   onDownloadTranscriptText,
@@ -786,7 +847,7 @@ export function SessionHistoryPanel({
   formatDuration
 }: SessionHistoryPanelProps) {
   return (
-    <section className="history-section rail-card">
+    <section className="history-section utility-surface">
       <div className="section-heading">
         <div>
           <p className="section-kicker">History</p>
@@ -812,7 +873,7 @@ export function SessionHistoryPanel({
           </article>
         ))}
       </div>
-      {transcriptViewer.session ? (
+      {showTranscriptViewer && transcriptViewer.session ? (
         <div className="transcript-viewer">
           <div className="transcript-header">
             <div>
@@ -829,58 +890,188 @@ export function SessionHistoryPanel({
               </p>
             </div>
           </div>
-          <CollapsibleSection
-            title="Transcript tools"
-            subtitle="Copy or export this transcript when you need it."
-            defaultExpanded={false}
-          >
-            <div className="transcript-export-actions">
-              <button
-                type="button"
-                className="ghost"
-                onClick={onCopyTranscript}
-                disabled={!transcriptViewer.transcript}
-              >
-                Copy transcript
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                onClick={onDownloadTranscriptText}
-                disabled={!transcriptViewer.transcript}
-              >
-                Download .txt
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                onClick={onDownloadTranscriptMarkdown}
-                disabled={!transcriptViewer.transcript}
-              >
-                Download .md
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                onClick={onDownloadRawTranscript}
-                disabled={transcriptViewer.isLoading || !transcriptViewer.session}
-              >
-                Download raw
-              </button>
-            </div>
-          </CollapsibleSection>
+          <div className="transcript-export-actions">
+            <button
+              type="button"
+              className="ghost"
+              onClick={onCopyTranscript}
+              disabled={!transcriptViewer.transcript}
+            >
+              Copy transcript
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={onDownloadTranscriptText}
+              disabled={!transcriptViewer.transcript}
+            >
+              Download .txt
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={onDownloadTranscriptMarkdown}
+              disabled={!transcriptViewer.transcript}
+            >
+              Download .md
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={onDownloadRawTranscript}
+              disabled={transcriptViewer.isLoading || !transcriptViewer.session}
+            >
+              Download raw
+            </button>
+          </div>
           {transcriptViewer.isLoading ? <p className="history-empty">Loading transcript...</p> : null}
           {!transcriptViewer.isLoading && transcriptViewer.error ? <p className="history-empty">{transcriptViewer.error}</p> : null}
           {!transcriptViewer.isLoading && !transcriptViewer.error ? (
             <pre className="transcript-panel">{transcriptViewer.transcript || "Transcript is empty."}</pre>
           ) : null}
         </div>
-      ) : (
+      ) : showTranscriptViewer ? (
         <div className="transcript-empty-state">
-          <strong>Transcript viewer</strong>
-          <p>Open any recent session to read its transcript here.</p>
+          <strong>No transcript yet</strong>
+          <p>Open a recent session to review its transcript here.</p>
         </div>
-      )}
+      ) : null}
+    </section>
+  );
+}
+
+function ResultsSummaryCard({
+  sessionBanner,
+  sessionActivity,
+  latestSession,
+  repoInsightsPanel,
+  onOpenTranscript,
+  onOpenChanges,
+  formatDuration
+}: {
+  sessionBanner: ConsoleViewProps["sessionBanner"];
+  sessionActivity: ConsoleViewProps["sessionActivity"];
+  latestSession: ConsoleViewProps["latestSession"];
+  repoInsightsPanel: ConsoleViewProps["repoInsightsPanel"];
+  onOpenTranscript(): void;
+  onOpenChanges(): void;
+  formatDuration(durationMs: number | null): string;
+}) {
+  const endedAt =
+    sessionActivity.completedAt ||
+    sessionActivity.failedAt ||
+    sessionActivity.disconnectedAt ||
+    sessionActivity.lastActivityAt;
+  const duration =
+    latestSession?.durationMs !== null && latestSession?.durationMs !== undefined
+      ? formatDuration(latestSession.durationMs)
+      : formatElapsedDuration(sessionActivity.startedAt, endedAt);
+  const transcriptAvailable = Boolean(latestSession);
+  const changesAvailable = Boolean(
+    repoInsightsPanel.diffPanelText ||
+      repoInsightsPanel.diffEmptyState ||
+      (repoInsightsPanel.gitStatus &&
+        (repoInsightsPanel.gitStatus.changedFilesCount > 0 ||
+          repoInsightsPanel.gitStatus.stagedFilesCount > 0 ||
+          repoInsightsPanel.gitStatus.untrackedFilesCount > 0))
+  );
+
+  return (
+    <section className="results-summary-card workspace-card">
+      <div className="section-heading">
+        <div>
+          <p className="section-kicker">Results</p>
+          <h2>{sessionBanner.title}</h2>
+        </div>
+        <span className="section-chip">{formatSessionBannerStateLabel(sessionBanner.state)}</span>
+      </div>
+      <p className="results-summary-copy">{sessionBanner.detail}</p>
+      <div className="results-summary-grid">
+        <article className="meta-pill">
+          <span className="meta-label">Completed at</span>
+          <strong>{endedAt ? new Date(endedAt).toLocaleString() : "Waiting for final output"}</strong>
+        </article>
+        <article className="meta-pill">
+          <span className="meta-label">Duration</span>
+          <strong>{duration || "Not available yet"}</strong>
+        </article>
+        <article className="meta-pill">
+          <span className="meta-label">Last activity</span>
+          <strong>
+            {sessionActivity.lastActivityAt ? new Date(sessionActivity.lastActivityAt).toLocaleString() : "Not available"}
+          </strong>
+        </article>
+        <article className="meta-pill">
+          <span className="meta-label">Repo changes</span>
+          <strong>{changesAvailable ? "Available to inspect" : "No changes detected yet"}</strong>
+        </article>
+      </div>
+      <div className="results-summary-status-list">
+        <span className={`summary-pill ${transcriptAvailable ? "ready" : "muted"}`}>
+          {transcriptAvailable ? "Transcript available" : "Transcript not ready yet"}
+        </span>
+        <span className={`summary-pill ${changesAvailable ? "ready" : "muted"}`}>
+          {changesAvailable ? "Changes available" : "No changes available"}
+        </span>
+      </div>
+      <div className="results-summary-actions">
+        <button type="button" className="secondary" onClick={onOpenTranscript} disabled={!transcriptAvailable}>
+          Open transcript
+        </button>
+        <button type="button" className="ghost" onClick={onOpenChanges}>
+          Inspect changes
+        </button>
+      </div>
+      <p className="helper-text results-next-step">
+        <strong>Next step:</strong> {getSuggestedNextAction(sessionBanner)}
+      </p>
+    </section>
+  );
+}
+
+function UtilityPanel({
+  utilityMode,
+  onUtilityModeChange,
+  pendingContextPanel,
+  repoInsightsPanel,
+  sessionHistoryPanel
+}: {
+  utilityMode: ConsoleViewProps["utilityMode"];
+  onUtilityModeChange(nextMode: ConsoleViewProps["utilityMode"]): void;
+  pendingContextPanel: ConsoleViewProps["pendingContextPanel"];
+  repoInsightsPanel: ConsoleViewProps["repoInsightsPanel"];
+  sessionHistoryPanel: ConsoleViewProps["sessionHistoryPanel"];
+}) {
+  const utilityTabButtons = (["context", "history", "transcript", "changes"] as const).map((mode) => (
+    <button
+      key={mode}
+      type="button"
+      role="tab"
+      aria-selected={utilityMode === mode}
+      className={utilityMode === mode ? "utility-tab active" : "utility-tab"}
+      onClick={() => onUtilityModeChange(mode)}
+    >
+      {formatUtilityModeLabel(mode)}
+    </button>
+  ));
+
+  return (
+    <section className="utility-panel rail-card">
+      <div className="section-heading utility-panel-heading">
+        <div>
+          <p className="section-kicker">Utilities</p>
+          <h2>{formatUtilityModeLabel(utilityMode)}</h2>
+        </div>
+      </div>
+      <div className="utility-mode-tabs" role="tablist" aria-label="Utility panels">
+        {utilityTabButtons}
+      </div>
+      <div className="utility-panel-body">
+        {utilityMode === "context" ? <PendingContextPanel {...pendingContextPanel} /> : null}
+        {utilityMode === "changes" ? <RepoInsightsPanel {...repoInsightsPanel} /> : null}
+        {utilityMode === "history" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer={false} /> : null}
+        {utilityMode === "transcript" ? <SessionHistoryPanel {...sessionHistoryPanel} showTranscriptViewer /> : null}
+      </div>
     </section>
   );
 }
@@ -891,22 +1082,37 @@ export function ConsoleView({
   composerPanel,
   repoInsightsPanel,
   sessionHistoryPanel,
+  workflowPhase,
+  utilityMode,
+  onUtilityModeChange,
   status,
   sessionBanner,
   sessionActivity,
+  latestSession,
   terminalContainerRef
 }: ConsoleViewProps) {
   const terminalGuidance = buildTerminalGuidance(sessionBanner);
+  const showResultsSummary = workflowPhase === "results";
 
   return (
-    <div className="console-layout">
+    <div className={`console-layout workflow-${workflowPhase}`}>
       <aside className="control-rail">
         <ProjectControls {...projectControls} />
-        <PendingContextPanel {...pendingContextPanel} />
       </aside>
 
       <main className="workspace-main">
         <ComposerPanel {...composerPanel} />
+        {showResultsSummary ? (
+          <ResultsSummaryCard
+            sessionBanner={sessionBanner}
+            sessionActivity={sessionActivity}
+            latestSession={latestSession}
+            repoInsightsPanel={repoInsightsPanel}
+            onOpenTranscript={() => onUtilityModeChange("transcript")}
+            onOpenChanges={() => onUtilityModeChange("changes")}
+            formatDuration={sessionHistoryPanel.formatDuration}
+          />
+        ) : null}
 
         <section className="terminal-section workspace-card">
           <div
@@ -922,6 +1128,7 @@ export function ConsoleView({
               </div>
               <div className="terminal-stage-meta">
                 <span className="section-chip">{status.active ? formatSessionBannerStateLabel(sessionBanner.state) : "Waiting"}</span>
+                <span className="section-chip workflow-phase-chip">{formatWorkflowPhaseLabel(workflowPhase)}</span>
               </div>
             </div>
             {terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
@@ -930,9 +1137,14 @@ export function ConsoleView({
         </section>
       </main>
 
-      <aside className="insights-rail">
-        <RepoInsightsPanel {...repoInsightsPanel} />
-        <SessionHistoryPanel {...sessionHistoryPanel} />
+      <aside className="insights-rail utility-rail">
+        <UtilityPanel
+          utilityMode={utilityMode}
+          onUtilityModeChange={onUtilityModeChange}
+          pendingContextPanel={pendingContextPanel}
+          repoInsightsPanel={repoInsightsPanel}
+          sessionHistoryPanel={sessionHistoryPanel}
+        />
       </aside>
     </div>
   );

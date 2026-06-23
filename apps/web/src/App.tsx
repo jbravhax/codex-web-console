@@ -75,6 +75,7 @@ import {
 } from "./session-diagnostics";
 import { friendlyUploadErrorMessage } from "./ui-messages";
 import { loadReadiness } from "./readiness";
+import { deriveWorkflowPhase, recommendUtilityMode, type UtilityMode } from "./workflow-phase";
 
 const DEFAULT_SETTINGS: AppSettings = {
   codexExecutablePath: "codex",
@@ -175,6 +176,7 @@ export function App() {
     failedAt: null
   });
   const [readiness, setReadiness] = useState<ReadinessSummary | null>(null);
+  const [utilityMode, setUtilityMode] = useState<UtilityMode>("history");
 
   const readyPendingItemCount = countReadyPendingContextItems(pendingContextItems);
   const pendingContextPreviewLines = buildPendingContextPreview(pendingContextItems);
@@ -182,6 +184,25 @@ export function App() {
   const generatedPromptPreview = buildPromptPreviewOutput(promptText, pendingContextItems);
   const diffPanelText = diffViewer.diff ? buildGitDiffPanelText(diffViewer.diff) : "";
   const diffEmptyState = diffViewer.diff ? buildGitDiffEmptyState(diffViewer.diff) : "";
+  const workflowPhase = deriveWorkflowPhase({
+    sessionBannerState: sessionBanner.state,
+    repoPath,
+    promptText,
+    readyPendingItemCount
+  });
+  const latestSession = sessions[0] ?? null;
+  const hasRepoChanges = Boolean(
+    diffViewer.diff
+      ? diffViewer.diff.stagedDiff.trim() || diffViewer.diff.unstagedDiff.trim()
+      : gitStatus && (gitStatus.changedFilesCount > 0 || gitStatus.stagedFilesCount > 0 || gitStatus.untrackedFilesCount > 0)
+  );
+  const recommendedUtilityMode = recommendUtilityMode({
+    workflowPhase,
+    readyPendingItemCount,
+    hasTranscriptHistory: sessions.length > 0,
+    hasLoadedTranscript: Boolean(transcriptViewer.session),
+    hasRepoChanges
+  });
 
   const updateRepoPath = (nextPath: string) => {
     setRepoPath(nextPath);
@@ -245,6 +266,10 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
+
+  useEffect(() => {
+    setUtilityMode(recommendedUtilityMode);
+  }, [recommendedUtilityMode]);
 
   useEffect(() => {
     const terminal = new Terminal({
@@ -728,6 +753,7 @@ export function App() {
 
     const document = payload as SavedPromptDocument;
     setPendingContextItems((current) => appendGeneratedDocumentItem(current, document));
+    setUtilityMode("context");
     setPromptText((current) => {
       const separator = current.trim().length > 0 ? "\n" : "";
       return `${current}${separator}${buildDocumentReference(document.relativePath)}`;
@@ -797,6 +823,7 @@ export function App() {
       setPendingContextItems((current) =>
         replaceUploadingItem(current, uploadId, createPendingContextItemFromAttachment(attachment))
       );
+      setUtilityMode("context");
       if (attachment.kind === "zip") {
         setContextMessage(buildZipUploadSuccessMessage(attachment));
       } else {
@@ -983,6 +1010,7 @@ export function App() {
   const clearAllPendingContext = () => {
     setPendingContextItems(clearPendingContext());
     setContextMessage("Cleared all pending context for the next prompt.");
+    setUtilityMode("context");
   };
 
   const copyItemRelativePath = async (relativePath: string) => {
@@ -1038,6 +1066,7 @@ export function App() {
   };
 
   const viewTranscript = async (session: SessionHistoryItem) => {
+    setUtilityMode("transcript");
     setTranscriptViewer({
       session,
       transcript: "",
@@ -1123,6 +1152,7 @@ export function App() {
       return;
     }
 
+    setUtilityMode("changes");
     setDiffViewer({
       diff: null,
       isLoading: true,
@@ -1267,9 +1297,13 @@ export function App() {
             },
             formatDuration
           }}
+          workflowPhase={workflowPhase}
+          utilityMode={utilityMode}
+          onUtilityModeChange={setUtilityMode}
           status={status}
           sessionBanner={sessionBanner}
           sessionActivity={sessionActivity}
+          latestSession={latestSession}
           terminalContainerRef={terminalContainerRef}
         />
       ) : (
