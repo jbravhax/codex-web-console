@@ -1324,11 +1324,17 @@ export function App() {
             },
             onRemoveAttachment: removeAttachment
           }}
-            composerPanel={{
-              status,
-              promptText,
-              onPromptTextChange: setPromptText,
-              onPromptPaste: handlePromptPaste,
+              composerPanel={{
+                status,
+                waitingState:
+                  sessionBanner.state === "awaiting-approval"
+                    ? "approval"
+                    : sessionBanner.state === "awaiting-input"
+                      ? "input"
+                      : null,
+                promptText,
+                onPromptTextChange: setPromptText,
+                onPromptPaste: handlePromptPaste,
             onDrop: handleDrop,
             onFileSelection: handleFileSelection,
             fileInputRef,

@@ -637,6 +637,20 @@ textarea {
   gap: 1rem;
 }
 
+.composer-waiting-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.38rem 0.72rem;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #9a6700;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
 .pending-context-subtitle {
   margin: 0.35rem 0 0;
   color: var(--muted);

@@ -151,6 +151,7 @@ export type PendingContextPanelProps = {
 
 export type ComposerPanelProps = {
   status: SessionStatus;
+  waitingState: "approval" | "input" | null;
   promptText: string;
   onPromptTextChange(nextPrompt: string): void;
   onPromptPaste(content: React.ClipboardEvent<HTMLTextAreaElement>): void | Promise<void>;

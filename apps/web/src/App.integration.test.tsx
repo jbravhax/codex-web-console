@@ -543,7 +543,8 @@ describe("App integration", () => {
       payload: "Would you like to run the following command?\nPress enter to confirm"
     });
     expect((await screen.findAllByText("Waiting for approval")).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/approve in the terminal and work will continue automatically/i).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Waiting for approval")).toBeTruthy();
+    expect(screen.queryByText(/approve in the terminal and work will continue automatically/i)).toBeNull();
     expect(document.querySelector('[data-session-state="awaiting-approval"]')).toBeTruthy();
     expect(document.querySelector(".session-banner-awaiting-approval")).toBeNull();
 
@@ -1103,6 +1104,7 @@ describe("App integration", () => {
     });
 
     expect((await screen.findAllByText("Waiting for approval")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByLabelText("Waiting for approval")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Context" })).toBeTruthy();
   });
 

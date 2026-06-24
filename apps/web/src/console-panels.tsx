@@ -56,26 +56,6 @@ function formatReadinessStatusLabel(status: "passed" | "warning" | "failed"): st
   }
 }
 
-function buildTerminalGuidance(sessionBanner: SessionBanner): string | null {
-  if (sessionBanner.state === "awaiting-approval") {
-    return "Codex is waiting for approval in the terminal. Approve in the terminal and work will continue automatically. Press Enter there to approve or Esc to cancel.";
-  }
-
-  if (sessionBanner.state === "awaiting-input") {
-    return "Codex has reached a stopping point and is waiting for your next instruction. Use the prompt box below or type directly in the terminal to continue.";
-  }
-
-  if (sessionBanner.state === "completed") {
-    return "The last request appears complete. Review the terminal result, then send another prompt when you're ready.";
-  }
-
-  if (sessionBanner.state === "running" || sessionBanner.state === "starting") {
-    return "Codex is active in the terminal below. Keep an eye on it for progress, follow-up questions, or approval prompts.";
-  }
-
-  return null;
-}
-
 function formatTimestamp(timestamp: string | null): string | null {
   if (!timestamp) {
     return null;
@@ -893,6 +873,7 @@ export function PendingContextPanel({
 
 export function ComposerPanel({
   status,
+  waitingState,
   promptText,
   onPromptTextChange,
   onPromptPaste,
@@ -916,14 +897,19 @@ export function ComposerPanel({
         void onDrop(event);
       }}
     >
-      <div className="composer-header">
-        <div>
-          <h2>Guide Codex intentionally</h2>
-        </div>
-        <div className="attachment-actions">
-          <button type="button" onClick={onSendPrompt} disabled={!status.active}>
-            Send prompt
-          </button>
+        <div className="composer-header">
+          <div>
+            <h2>Guide Codex intentionally</h2>
+          </div>
+          <div className="attachment-actions">
+            {waitingState ? (
+              <span className="composer-waiting-pill" aria-label={waitingState === "approval" ? "Waiting for approval" : "Waiting for input"}>
+                Waiting
+              </span>
+            ) : null}
+            <button type="button" onClick={onSendPrompt} disabled={!status.active}>
+              Send prompt
+            </button>
           <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()} disabled={!status.active}>
             Attach files
           </button>
@@ -1332,44 +1318,6 @@ function UtilityPanel({
   );
 }
 
-function ApprovalActionStrip({
-  sessionBanner
-}: {
-  sessionBanner: ConsoleViewProps["sessionBanner"];
-}) {
-  if (sessionBanner.state !== "awaiting-approval" && sessionBanner.state !== "awaiting-input") {
-    return null;
-  }
-
-  const isApproval = sessionBanner.state === "awaiting-approval";
-
-  return (
-    <section className={`approval-action-strip ${isApproval ? "approval-pending approval" : "awaiting-input-strip"}`}>
-      <div className="approval-action-copy">
-        <strong>{isApproval ? "Codex is waiting for approval" : "Codex is waiting for your next instruction"}</strong>
-        <p>
-          {isApproval
-            ? "Approve in the terminal to keep the task moving. After approval, work will continue automatically."
-            : "Use the prompt box or the terminal to continue the session."}
-        </p>
-      </div>
-      <button
-        type="button"
-        className={isApproval ? undefined : "secondary"}
-        onClick={() => {
-          const promptInput = document.getElementById("prompt-input");
-          if (promptInput instanceof HTMLTextAreaElement) {
-            promptInput.focus();
-            promptInput.scrollIntoView?.({ block: "center", behavior: "smooth" });
-          }
-        }}
-      >
-        {isApproval ? "Review terminal" : "Write next prompt"}
-      </button>
-    </section>
-  );
-}
-
 export function ConsoleView({
   projectControls,
   pendingContextPanel,
@@ -1387,13 +1335,7 @@ export function ConsoleView({
 }: ConsoleViewProps) {
   const projectTitle = formatProjectTitle(projectControls.repoPath, projectControls.defaultRepoRoot);
   const projectSubtitle = buildProjectSubtitle(projectControls.repoPath, projectControls.defaultRepoRoot);
-  const terminalGuidance = buildTerminalGuidance(sessionBanner);
   const showResultsSummary = page === "workspace" && isResultsWorkspaceState(workspaceState);
-  const showTerminalGuidance =
-    sessionBanner.state === "awaiting-approval" ||
-    sessionBanner.state === "awaiting-input" ||
-    sessionBanner.state === "disconnected" ||
-    sessionBanner.state === "failed";
   const showProjectPage = page === "project";
   const showWorkspacePage = page === "workspace";
   const showReviewPage = isReviewPage(page);
@@ -1480,17 +1422,12 @@ export function ConsoleView({
                       </p>
                     </div>
                   </div>
-                    {showTerminalGuidance && terminalGuidance ? <p className="terminal-guidance">{terminalGuidance}</p> : null}
                     <div ref={terminalContainerRef} className="terminal-panel" />
                   </div>
               </section>
 
               <div className="workspace-region workspace-region-composer">
                 <ComposerPanel {...composerPanel} />
-              </div>
-
-              <div className="workspace-region workspace-region-approval">
-                <ApprovalActionStrip sessionBanner={sessionBanner} />
               </div>
             </div>
           </section>
