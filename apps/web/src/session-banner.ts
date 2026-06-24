@@ -28,7 +28,7 @@ type SessionBannerEvent =
   | { type: "completion-detected"; repoPath: string | null }
   | { type: "activity-detected"; repoPath: string | null }
   | { type: "stop-requested" }
-  | { type: "exit-received"; exitCode: number; signal: number; failedDetail?: string }
+  | { type: "exit-received"; exitCode: number; signal: number; failedDetail?: string; resumeAvailable?: boolean }
   | { type: "websocket-close"; detail: string }
   | { type: "error-received"; detail: string };
 
@@ -141,7 +141,7 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
     return {
       state: "stopping",
       title: "Stopping session",
-      detail: "Stopping the current Codex session..."
+      detail: "Asking Codex to quit cleanly so this session can be continued later."
     };
   }
 
@@ -158,7 +158,9 @@ export function reduceSessionBanner(previous: SessionBanner, event: SessionBanne
       return {
         state: "stopped",
         title: "Session stopped",
-        detail: `The stop request finished and Codex exited with code ${event.exitCode} and signal ${event.signal}.`
+        detail: event.resumeAvailable
+          ? "Codex stopped cleanly. You can continue this session later from the same project."
+          : `Codex stopped with exit code ${event.exitCode} and signal ${event.signal}.`
       };
     }
 

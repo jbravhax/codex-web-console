@@ -33,14 +33,16 @@ export function attachSessionSocket(socket: SessionSocket, ownerId: string, sess
     }
 
     const typedMessage = message as
-      | { type: "start"; repoPath?: string }
+      | { type: "start"; repoPath?: string; resumeLast?: boolean }
       | { type: "input"; data?: string }
       | { type: "stop" }
       | { type: "resize"; cols?: number; rows?: number };
 
     if (typedMessage.type === "start") {
       try {
-        const session = sessionManager.start(ownerId, typedMessage.repoPath ?? "");
+        const session = sessionManager.start(ownerId, typedMessage.repoPath ?? "", {
+          resumeLast: typedMessage.resumeLast === true
+        });
 
         session.ptyProcess.onData((data) => {
           sessionManager.appendOutput(ownerId, data);
@@ -62,7 +64,8 @@ export function attachSessionSocket(socket: SessionSocket, ownerId: string, sess
               signal: resolvedSignal,
               startedAt: session.startedAt,
               endedAt,
-              failure
+              failure,
+              resumeAvailable: session.gracefulStopRequested && !session.forcedStopAfterGracefulRequest
             });
             sendMessage(socket, "status", sessionManager.getStatus(ownerId));
           }

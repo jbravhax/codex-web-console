@@ -377,7 +377,9 @@ function ProjectRail({
   recentProjectCount,
   readyPendingItemCount,
   hasActiveSession,
+  canContinueSession,
   onStartSession,
+  onContinueSession,
   onStopSession
 }: {
   page: ConsoleViewProps["page"];
@@ -389,7 +391,9 @@ function ProjectRail({
   recentProjectCount: number;
   readyPendingItemCount: number;
   hasActiveSession: boolean;
+  canContinueSession: boolean;
   onStartSession(): void;
+  onContinueSession(): void;
   onStopSession(): void;
 }) {
   const menuItems: Array<{
@@ -455,6 +459,11 @@ function ProjectRail({
         <button type="button" className="ghost rail-mini-action" onClick={() => onSelectPage("project")}>
           New project
         </button>
+        {canContinueSession ? (
+          <button type="button" className="secondary rail-mini-action" onClick={onContinueSession} disabled={hasActiveSession}>
+            Continue session
+          </button>
+        ) : null}
         <button type="button" className="secondary rail-mini-action" onClick={onStartSession} disabled={!hasProjectPath || hasActiveSession}>
           Start session
         </button>
@@ -477,6 +486,8 @@ export function ProjectControls({
   onCreateProjectOptionChange,
   onCreateProject,
   isCreatingProject,
+  onContinueSession,
+  canContinueSession,
   connectionStateLabel,
   defaultRepoRoot,
   isLoadingSettings,
@@ -620,6 +631,14 @@ export function ProjectControls({
           </div>
         </CollapsibleSection>
       </div>
+      {canContinueSession ? (
+        <div className="project-resume-row">
+          <button type="button" className="secondary" onClick={onContinueSession}>
+            Continue last session
+          </button>
+          <p className="helper-text">Resume the most recent Codex session saved for this project.</p>
+        </div>
+      ) : null}
       <CollapsibleSection
         title="Readiness"
         subtitle={readinessSummary}
@@ -1408,7 +1427,9 @@ export function ConsoleView({
             recentProjectCount={projectControls.recentProjects.length}
             readyPendingItemCount={pendingContextPanel.readyPendingItemCount}
             hasActiveSession={status.active}
+            canContinueSession={projectControls.canContinueSession}
             onStartSession={projectControls.onStartSession}
+            onContinueSession={projectControls.onContinueSession}
             onStopSession={projectControls.onStopSession}
           />
       </aside>

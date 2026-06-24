@@ -43,6 +43,7 @@ export type SessionHistoryItem = {
   startTime: string;
   endTime: string | null;
   durationMs: number | null;
+  resumeAvailable: boolean;
 };
 
 export type TranscriptViewerState = {
@@ -125,6 +126,8 @@ export type ProjectControlsProps = {
   onCreateProject(): void;
   isCreatingProject: boolean;
   onStartSession(): void;
+  onContinueSession(): void;
+  canContinueSession: boolean;
   onStopSession(): void;
   connectionStateLabel: string;
   defaultRepoRoot: string;

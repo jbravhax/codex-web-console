@@ -2,6 +2,7 @@
   "name": "@codex-console/web",
   "version": "0.6.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -111,7 +111,8 @@ describe("SessionManager", () => {
       id: session.sessionId,
       repoPath,
       endTime: expect.any(String),
-      durationMs: expect.any(Number)
+      durationMs: expect.any(Number),
+      resumeAvailable: false
     });
     expect(manager.listSessions(1)[0]?.repoPath).toBe(repoPath);
   });
@@ -167,7 +168,7 @@ describe("SessionManager", () => {
     expect(fs.readFileSync(session.transcriptPath, "utf8")).toBe("before clear\n");
   });
 
-  it("delegates write, resize, and stop to the PTY process", () => {
+  it("delegates write, resize, and graceful stop to the PTY process", () => {
     const repoPath = makeProjectDir("codex-web-session-");
     createdProjectPaths.push(repoPath);
     const fakePty = new FakePtyProcess();
@@ -182,7 +183,44 @@ describe("SessionManager", () => {
 
     expect(fakePty.write).toHaveBeenCalledWith("prompt");
     expect(fakePty.resize).toHaveBeenCalledWith(140, 40);
-    expect(fakePty.kill).toHaveBeenCalledTimes(1);
+    expect(fakePty.write).toHaveBeenCalledWith("/quit\r");
+    expect(fakePty.kill).not.toHaveBeenCalled();
+  });
+
+  it("marks a cleanly stopped session as resumable", () => {
+    const repoPath = makeProjectDir("codex-web-session-");
+    createdProjectPaths.push(repoPath);
+    const fakePty = new FakePtyProcess();
+    spawnMock.mockReturnValue(fakePty);
+    const manager = new SessionManager(() => makeConfig());
+    managersToCleanup.push(manager);
+
+    const session = manager.start("owner-resume", repoPath);
+    manager.stop("owner-resume");
+    manager.clear("owner-resume");
+
+    expect(JSON.parse(fs.readFileSync(session.metadataPath, "utf8"))).toMatchObject({
+      resumeAvailable: true
+    });
+    expect(manager.listSessions(1)[0]?.resumeAvailable).toBe(true);
+  });
+
+  it("starts Codex in resume mode when requested", () => {
+    const repoPath = makeProjectDir("codex-web-session-");
+    createdProjectPaths.push(repoPath);
+    spawnMock.mockReturnValue(new FakePtyProcess());
+    const manager = new SessionManager(() => makeConfig());
+    managersToCleanup.push(manager);
+
+    manager.start("owner-resume-start", repoPath, { resumeLast: true });
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      "codex",
+      ["resume", "--last"],
+      expect.objectContaining({
+        cwd: repoPath
+      })
+    );
   });
 
   it("rejects a second active session for the same owner", () => {

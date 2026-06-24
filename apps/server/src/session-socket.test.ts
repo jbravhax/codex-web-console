@@ -67,7 +67,13 @@ describe("attachSessionSocket", () => {
         .fn()
         .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
         .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt }),
-      start: vi.fn().mockReturnValue({ ptyProcess: fakePty, startedAt, repoPath: "/workspace/project" }),
+      start: vi.fn().mockReturnValue({
+        ptyProcess: fakePty,
+        startedAt,
+        repoPath: "/workspace/project",
+        gracefulStopRequested: false,
+        forcedStopAfterGracefulRequest: false
+      }),
       getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),
       clear: vi.fn(),
@@ -80,7 +86,7 @@ describe("attachSessionSocket", () => {
     socket.emitMessage({ type: "start", repoPath: "/workspace/project" });
 
     expect(socket.sent[0]).toEqual({ type: "status", payload: { active: false, repoPath: null, startedAt: null } });
-    expect(sessionManager.start).toHaveBeenCalledWith("owner-1", "/workspace/project");
+    expect(sessionManager.start).toHaveBeenCalledWith("owner-1", "/workspace/project", { resumeLast: false });
     expect(socket.sent[1]).toEqual({ type: "status", payload: { active: true, repoPath: "/workspace/project", startedAt } });
   });
 
@@ -94,7 +100,13 @@ describe("attachSessionSocket", () => {
         .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
         .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt })
         .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null }),
-      start: vi.fn().mockReturnValue({ ptyProcess: fakePty, startedAt, repoPath: "/workspace/project" }),
+      start: vi.fn().mockReturnValue({
+        ptyProcess: fakePty,
+        startedAt,
+        repoPath: "/workspace/project",
+        gracefulStopRequested: true,
+        forcedStopAfterGracefulRequest: false
+      }),
       getRecentOutput: vi.fn().mockReturnValue("codex output"),
       appendOutput: vi.fn(),
       clear: vi.fn(),
@@ -113,7 +125,14 @@ describe("attachSessionSocket", () => {
     expect(sessionManager.clear).toHaveBeenCalledWith("owner-2");
     expect(socket.sent).toContainEqual({
       type: "exit",
-      payload: expect.objectContaining({ exitCode: 0, signal: 15, startedAt, endedAt: expect.any(String), failure: null })
+      payload: expect.objectContaining({
+        exitCode: 0,
+        signal: 15,
+        startedAt,
+        endedAt: expect.any(String),
+        failure: null,
+        resumeAvailable: true
+      })
     });
     expect(socket.sent).toContainEqual({ type: "status", payload: { active: false, repoPath: null, startedAt: null } });
   });
@@ -140,6 +159,36 @@ describe("attachSessionSocket", () => {
     expect(sessionManager.write).toHaveBeenCalledWith("owner-3", "hello");
     expect(sessionManager.resize).toHaveBeenCalledWith("owner-3", 132, 44);
     expect(sessionManager.stop).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts a resumed session when the websocket asks for the latest saved session", () => {
+    const socket = new FakeSocket();
+    const fakePty = new FakePtyProcess();
+    const startedAt = "2026-06-22T21:00:00.000Z";
+    const sessionManager = {
+      getStatus: vi
+        .fn()
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
+        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt }),
+      start: vi.fn().mockReturnValue({
+        ptyProcess: fakePty,
+        startedAt,
+        repoPath: "/workspace/project",
+        gracefulStopRequested: false,
+        forcedStopAfterGracefulRequest: false
+      }),
+      getRecentOutput: vi.fn().mockReturnValue(""),
+      appendOutput: vi.fn(),
+      clear: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      stop: vi.fn()
+    };
+
+    attachSessionSocket(socket, "owner-resume", sessionManager as never);
+    socket.emitMessage({ type: "start", repoPath: "/workspace/project", resumeLast: true });
+
+    expect(sessionManager.start).toHaveBeenCalledWith("owner-resume", "/workspace/project", { resumeLast: true });
   });
 
   it("rejects invalid and malformed websocket messages", () => {
@@ -202,7 +251,9 @@ describe("attachSessionSocket", () => {
       start: vi.fn().mockReturnValue({
         ptyProcess: fakePty,
         startedAt: "2026-06-22T21:05:00.000Z",
-        repoPath: "/workspace/project"
+        repoPath: "/workspace/project",
+        gracefulStopRequested: false,
+        forcedStopAfterGracefulRequest: false
       }),
       getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),

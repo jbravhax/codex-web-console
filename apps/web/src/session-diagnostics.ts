@@ -22,6 +22,7 @@ export type SessionExitPayload = {
   startedAt?: string | null;
   endedAt?: string | null;
   failure?: SessionFailurePayload | null;
+  resumeAvailable?: boolean;
 };
 
 export type SessionErrorDisplay = {

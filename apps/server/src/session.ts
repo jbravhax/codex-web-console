@@ -18,6 +18,7 @@ export type SessionListItem = {
   startTime: string;
   endTime: string | null;
   durationMs: number | null;
+  resumeAvailable: boolean;
 };
 
 type SessionMetadata = {
@@ -26,6 +27,11 @@ type SessionMetadata = {
   startTime: string;
   endTime: string | null;
   durationMs: number | null;
+  resumeAvailable: boolean;
+};
+
+type SessionStartOptions = {
+  resumeLast?: boolean;
 };
 
 type ActiveSession = {
@@ -39,6 +45,9 @@ type ActiveSession = {
   metadataPath: string;
   recentOutput: string;
   isFinalized: boolean;
+  gracefulStopRequested: boolean;
+  forcedStopAfterGracefulRequest: boolean;
+  stopTimeout: NodeJS.Timeout | null;
 };
 
 const SESSIONS_ROOT = path.join(os.homedir(), ".codex-web-console", "sessions");
@@ -79,7 +88,8 @@ function finalizeSession(session: ActiveSession): void {
     repoPath: session.repoPath,
     startTime: session.startedAt,
     endTime,
-    durationMs
+    durationMs,
+    resumeAvailable: session.gracefulStopRequested && !session.forcedStopAfterGracefulRequest
   });
 }
 
@@ -100,7 +110,7 @@ export class SessionManager {
     };
   }
 
-  start(ownerId: string, repoPath: string): ActiveSession {
+  start(ownerId: string, repoPath: string, options: SessionStartOptions = {}): ActiveSession {
     if (this.sessions.has(ownerId)) {
       throw new Error("This browser session already has an active Codex process.");
     }
@@ -118,7 +128,8 @@ export class SessionManager {
     fs.writeFileSync(transcriptPath, "", "utf8");
     fs.writeFileSync(rawTranscriptPath, "", "utf8");
     const config = this.getConfig();
-    const ptyProcess = pty.spawn(config.codexExecutablePath, [], {
+    const commandArgs = options.resumeLast ? ["resume", "--last"] : [];
+    const ptyProcess = pty.spawn(config.codexExecutablePath, commandArgs, {
       name: "xterm-256color",
       cols: 120,
       rows: 32,
@@ -139,7 +150,10 @@ export class SessionManager {
       rawTranscriptPath,
       metadataPath,
       recentOutput: "",
-      isFinalized: false
+      isFinalized: false,
+      gracefulStopRequested: false,
+      forcedStopAfterGracefulRequest: false,
+      stopTimeout: null
     };
 
     writeMetadata(metadataPath, {
@@ -147,7 +161,8 @@ export class SessionManager {
       repoPath: validatedPath,
       startTime: startedAt,
       endTime: null,
-      durationMs: null
+      durationMs: null,
+      resumeAvailable: false
     });
 
     this.sessions.set(ownerId, session);
@@ -161,7 +176,20 @@ export class SessionManager {
       return;
     }
 
-    session.ptyProcess.kill();
+    if (session.gracefulStopRequested) {
+      return;
+    }
+
+    session.gracefulStopRequested = true;
+    session.ptyProcess.write("/quit\r");
+    session.stopTimeout = setTimeout(() => {
+      if (!this.sessions.has(ownerId)) {
+        return;
+      }
+
+      session.forcedStopAfterGracefulRequest = true;
+      session.ptyProcess.kill();
+    }, 5000);
   }
 
   write(ownerId: string, data: string): void {
@@ -208,6 +236,11 @@ export class SessionManager {
       return;
     }
 
+    if (session.stopTimeout) {
+      clearTimeout(session.stopTimeout);
+      session.stopTimeout = null;
+    }
+
     finalizeSession(session);
     this.sessions.delete(ownerId);
   }
@@ -237,7 +270,8 @@ export class SessionManager {
         repoPath: metadata.repoPath,
         startTime: metadata.startTime,
         endTime: metadata.endTime,
-        durationMs: metadata.durationMs
+        durationMs: metadata.durationMs,
+        resumeAvailable: metadata.resumeAvailable ?? false
       }));
   }
 

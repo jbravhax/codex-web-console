@@ -89,7 +89,12 @@ describe("session banner state", () => {
 
   it("moves from stopping to stopped when the process exits and ignores the follow-up inactive status", () => {
     const stopping = reduceSessionBanner(createInitialSessionBanner(), { type: "stop-requested" });
-    const stopped = reduceSessionBanner(stopping, { type: "exit-received", exitCode: 0, signal: 15 });
+    const stopped = reduceSessionBanner(stopping, {
+      type: "exit-received",
+      exitCode: 0,
+      signal: 15,
+      resumeAvailable: true
+    });
     const afterStatus = reduceSessionBanner(stopped, {
       type: "status-received",
       active: false,
@@ -97,8 +102,9 @@ describe("session banner state", () => {
     });
 
     expect(stopping.state).toBe("stopping");
+    expect(stopping.detail).toContain("quit cleanly");
     expect(stopped.state).toBe("stopped");
-    expect(stopped.detail).toContain("stop request finished");
+    expect(stopped.detail).toContain("continue this session later");
     expect(afterStatus).toEqual(stopped);
   });
 

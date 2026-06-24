@@ -14,7 +14,8 @@ const session: SessionHistoryItem = {
   repoPath: "/workspace/example-repo",
   startTime: "2026-06-21T12:00:00.000Z",
   endTime: "2026-06-21T12:05:00.000Z",
-  durationMs: 300000
+  durationMs: 300000,
+  resumeAvailable: false
 };
 
 beforeEach(() => {

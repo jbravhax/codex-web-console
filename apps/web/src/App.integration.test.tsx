@@ -446,7 +446,9 @@ describe("App integration", () => {
 
     expect((await screen.findAllByText("That project folder does not exist yet.")).length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText(/Next step: Create it first/i)).toBeTruthy();
-    expect(socket.sent).not.toContain(JSON.stringify({ type: "start", repoPath: "/workspace/missing-project" }));
+    expect(socket.sent).not.toContain(
+      JSON.stringify({ type: "start", repoPath: "/workspace/missing-project", resumeLast: false })
+    );
   });
 
   it("shows parent-folder guidance before session start when the chosen path looks too broad", async () => {
@@ -550,6 +552,42 @@ describe("App integration", () => {
       payload: "Created only README.md."
     });
     expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("continues the latest resumable session for the selected project", async () => {
+    const socket = renderApp({
+      sessions: {
+        items: [
+          {
+            id: "session-continue",
+            repoPath: "/workspace/default-project",
+            startTime: "2026-06-22T21:10:00.000Z",
+            endTime: "2026-06-22T21:12:00.000Z",
+            durationMs: 120000,
+            resumeAvailable: true
+          }
+        ]
+      }
+    });
+
+    await openProjectPage();
+    fireEvent.change(screen.getByLabelText("Project folder path"), {
+      target: {
+        value: "/workspace/default-project"
+      }
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Continue session" }));
+
+    await waitFor(() => {
+      expect(socket.sent).toContain(
+        JSON.stringify({
+          type: "start",
+          repoPath: "/workspace/default-project",
+          resumeLast: true
+        })
+      );
+    });
   });
 
   it("submits with Enter and keeps Shift+Enter available for a new line", async () => {

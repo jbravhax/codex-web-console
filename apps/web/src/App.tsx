@@ -200,6 +200,10 @@ export function App() {
     readyPendingItemCount
   });
   const latestSession = sessions[0] ?? null;
+  const resumableSession =
+    !status.active && repoPath.trim()
+      ? sessions.find((session) => session.repoPath === repoPath.trim() && session.resumeAvailable) ?? null
+      : null;
   const hasRepoChanges = Boolean(
     diffViewer.diff
       ? diffViewer.diff.stagedDiff.trim() || diffViewer.diff.unstagedDiff.trim()
@@ -594,14 +598,15 @@ export function App() {
         if (exitDisplay) {
           setError(`${exitDisplay.detail}\nTechnical details: ${exitDisplay.technicalDetail}`);
         }
-        setSessionBanner((current) =>
-          reduceSessionBanner(current, {
-            type: "exit-received",
-            exitCode: message.payload.exitCode,
-            signal: message.payload.signal,
-            failedDetail: exitDisplay?.detail
-          })
-        );
+          setSessionBanner((current) =>
+            reduceSessionBanner(current, {
+              type: "exit-received",
+              exitCode: message.payload.exitCode,
+              signal: message.payload.signal,
+              failedDetail: exitDisplay?.detail,
+              resumeAvailable: message.payload.resumeAvailable
+            })
+          );
         setPendingContextItems([]);
         writeTerminalLine("");
         writeTerminalLine(
@@ -669,7 +674,7 @@ export function App() {
     };
   }, [writeTerminalLine, writeToTerminal]);
 
-  const startSession = async () => {
+  const beginSession = async (resumeLast = false) => {
     if (socketRef.current?.readyState !== WebSocket.OPEN) {
       const detail = "The local server connection is not ready yet.";
       setError(`${detail}\nTechnical details: websocket readyState was not OPEN when start was requested.`);
@@ -701,13 +706,14 @@ export function App() {
     });
     setSessionBanner((current) => reduceSessionBanner(current, { type: "start-requested", repoPath }));
     setPage("workspace");
-    resetTerminalBuffer();
-    socketRef.current?.send(
-      JSON.stringify({
-        type: "start",
-        repoPath
-      })
-    );
+      resetTerminalBuffer();
+      socketRef.current?.send(
+        JSON.stringify({
+          type: "start",
+          repoPath,
+          resumeLast
+        })
+      );
 
     const dimensions = fitAddonRef.current?.proposeDimensions();
     if (dimensions) {
@@ -719,6 +725,14 @@ export function App() {
         })
       );
     }
+  };
+
+  const startSession = async () => {
+    await beginSession(false);
+  };
+
+  const continueSession = async () => {
+    await beginSession(true);
   };
 
   const stopSession = () => {
@@ -1276,13 +1290,17 @@ export function App() {
             projectMessage,
             createProjectOptions,
             onCreateProjectOptionChange: setCreateProjectOptions,
-            onCreateProject: () => {
-              void createProjectFolder();
-            },
-            isCreatingProject,
-            onStartSession: () => {
-              void startSession();
-            },
+              onCreateProject: () => {
+                void createProjectFolder();
+              },
+              isCreatingProject,
+              onContinueSession: () => {
+                void continueSession();
+              },
+              canContinueSession: resumableSession !== null,
+              onStartSession: () => {
+                void startSession();
+              },
             onStopSession: stopSession,
             connectionStateLabel: formatConnectionState(connectionState),
             defaultRepoRoot: settings.defaultRepoRoot,

@@ -101,6 +101,10 @@ Follow-up plan:
 - `apps/web`: browser frontend
 - `apps/server`: local API server and PTY/session manager
 
+## License
+
+This project is licensed under the Apache License 2.0. See `LICENSE` for the full text.
+
 ## Install
 
 1. Clone this repository onto your Linux machine.
