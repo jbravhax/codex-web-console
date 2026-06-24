@@ -262,11 +262,7 @@ export function ConsoleHeader({
   onStopSession
 }: ConsoleHeaderProps) {
   const sessionMoments = buildSessionMomentRows(sessionBanner, sessionActivity);
-  const isExceptionalBannerState =
-    sessionBanner.state === "awaiting-approval" ||
-    sessionBanner.state === "awaiting-input" ||
-    sessionBanner.state === "disconnected" ||
-    sessionBanner.state === "failed";
+  const isExceptionalBannerState = sessionBanner.state === "disconnected" || sessionBanner.state === "failed";
   const liveDuration = formatLiveDuration(
     sessionActivity.startedAt,
     sessionActivity.completedAt ||
@@ -277,7 +273,7 @@ export function ConsoleHeader({
   const showApprovalBadge = sessionBanner.state === "awaiting-approval";
   const showRunningIndicator =
     sessionBanner.state === "running" || sessionBanner.state === "starting" || sessionBanner.state === "awaiting-approval";
-  const showRoutineBanner = isExceptionalBannerState || sessionBanner.state === "completed" || sessionBanner.state === "stopped";
+  const showPageBanner = isExceptionalBannerState || sessionBanner.state === "completed" || sessionBanner.state === "stopped";
   const serverLabel = connectionStateLabel === "Connected" ? "Local app online" : connectionStateLabel;
   const sessionLabel = sessionBanner.state === "idle" ? "No session running" : sessionBanner.title;
   const showInlineSessionActions = sessionBanner.state === "stopped" || sessionBanner.state === "completed";
@@ -335,7 +331,7 @@ export function ConsoleHeader({
         </div>
       </header>
 
-      {showRoutineBanner ? (
+      {showPageBanner ? (
         <section
           className={`session-banner ${isExceptionalBannerState ? "session-banner-exception" : "session-banner-routine"} session-banner-${sessionBanner.state}`}
           aria-live="polite"

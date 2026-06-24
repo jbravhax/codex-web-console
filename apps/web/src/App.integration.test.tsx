@@ -543,6 +543,7 @@ describe("App integration", () => {
     expect((await screen.findAllByText("Waiting for approval")).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/approve in the terminal and work will continue automatically/i).length).toBeGreaterThan(0);
     expect(document.querySelector('[data-session-state="awaiting-approval"]')).toBeTruthy();
+    expect(document.querySelector(".session-banner-awaiting-approval")).toBeNull();
 
     socket.emitMessage({
       type: "output",
