@@ -159,12 +159,6 @@ export type ComposerPanelProps = {
   onFileSelection(event: React.ChangeEvent<HTMLInputElement>): void | Promise<void>;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   promptInputRef: React.RefObject<HTMLTextAreaElement | null>;
-  promptPreviewSummary: string;
-  promptPreviewSections: Array<{ label: string; lines: string[] }>;
-  generatedPromptPreview: string;
-  isPromptPreviewExpanded: boolean;
-  onTogglePromptPreview(): void;
-  onCopyPromptPreview(): void;
   onSendPrompt(): void;
 };
 

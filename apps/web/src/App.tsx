@@ -43,12 +43,9 @@ import { chooseRepoDirectory } from "./repo-picker";
 import {
   appendGeneratedDocumentItem,
   appendPendingContextItem,
-  buildPromptPreviewOutput,
-  buildPromptPreviewSections,
   buildPendingContextPreview,
   buildPromptWithPendingContext,
   clearPendingContext,
-  copyGeneratedPromptContext,
   countReadyPendingContextItems,
   copyRelativePath,
   createPendingContextItemFromAttachment,
@@ -174,7 +171,6 @@ export function App() {
     error: ""
   });
   const [sessionBanner, setSessionBanner] = useState<SessionBanner>(createInitialSessionBanner);
-  const [isPromptPreviewExpanded, setIsPromptPreviewExpanded] = useState(false);
   const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "disconnected">(
     "connecting"
   );
@@ -190,8 +186,6 @@ export function App() {
 
   const readyPendingItemCount = countReadyPendingContextItems(pendingContextItems);
   const pendingContextPreviewLines = buildPendingContextPreview(pendingContextItems);
-  const promptPreviewSections = buildPromptPreviewSections(promptText, pendingContextItems);
-  const generatedPromptPreview = buildPromptPreviewOutput(promptText, pendingContextItems);
   const diffPanelText = diffViewer.diff ? buildGitDiffPanelText(diffViewer.diff) : "";
   const diffEmptyState = diffViewer.diff ? buildGitDiffEmptyState(diffViewer.diff) : "";
   const workspaceState = deriveWorkspaceState({
@@ -1124,15 +1118,6 @@ export function App() {
     promptInputRef.current?.focus();
   };
 
-  const copyPromptPreview = async () => {
-    try {
-      const result = await copyGeneratedPromptContext(generatedPromptPreview);
-      setCopyFeedback("exactly what Codex will receive", result);
-    } catch (copyError) {
-      setClipboardFailure("the prompt preview", copyError);
-    }
-  };
-
   const viewTranscript = async (session: SessionHistoryItem) => {
     setPage("transcript");
     setTranscriptViewer({
@@ -1259,9 +1244,6 @@ export function App() {
   const pendingContextEmptyState = !status.active
     ? "No context added yet. Start a session first."
     : "No context added yet.";
-  const promptPreviewSummary = generatedPromptPreview.trim()
-    ? `${promptText.trim() ? "Prompt ready" : "Context ready"} with ${readyPendingItemCount} context item${readyPendingItemCount === 1 ? "" : "s"} prepared for Codex.`
-    : "Nothing will be sent yet.";
 
   return (
     <div className="app-shell">
@@ -1335,19 +1317,11 @@ export function App() {
                 promptText,
                 onPromptTextChange: setPromptText,
                 onPromptPaste: handlePromptPaste,
-            onDrop: handleDrop,
-            onFileSelection: handleFileSelection,
-            fileInputRef,
-            promptInputRef,
-            promptPreviewSummary,
-            promptPreviewSections,
-            generatedPromptPreview,
-            isPromptPreviewExpanded,
-            onTogglePromptPreview: () => setIsPromptPreviewExpanded((current) => !current),
-            onCopyPromptPreview: () => {
-              void copyPromptPreview();
-            },
-            onSendPrompt: sendPrompt
+                onDrop: handleDrop,
+                onFileSelection: handleFileSelection,
+                fileInputRef,
+                promptInputRef,
+                onSendPrompt: sendPrompt
           }}
           repoInsightsPanel={{
             status,

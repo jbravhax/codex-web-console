@@ -883,12 +883,6 @@ export function ComposerPanel({
   onFileSelection,
   fileInputRef,
   promptInputRef,
-  promptPreviewSummary,
-  promptPreviewSections,
-  generatedPromptPreview,
-  isPromptPreviewExpanded,
-  onTogglePromptPreview,
-  onCopyPromptPreview,
   onSendPrompt
 }: ComposerPanelProps) {
   return (
@@ -900,9 +894,6 @@ export function ComposerPanel({
       }}
     >
         <div className="composer-header">
-          <div>
-            <h2>Guide Codex intentionally</h2>
-          </div>
           <div className="attachment-actions">
             {waitingState ? (
               <span className="composer-waiting-pill" aria-label={waitingState === "approval" ? "Waiting for approval" : "Waiting for input"}>
@@ -950,50 +941,6 @@ export function ComposerPanel({
         disabled={!status.active}
         className="prompt-textarea"
       />
-      <div className="prompt-preview-panel">
-        <div className="prompt-preview-header">
-          <div>
-            <strong>What Codex will receive</strong>
-          </div>
-          <div className="prompt-preview-actions">
-            <button type="button" className="ghost" onClick={onTogglePromptPreview}>
-              {isPromptPreviewExpanded ? "Hide preview" : "Show preview"}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={onCopyPromptPreview}
-              disabled={!generatedPromptPreview.trim()}
-            >
-              Copy preview
-            </button>
-          </div>
-        </div>
-        <p className="prompt-preview-summary">{promptPreviewSummary}</p>
-        {isPromptPreviewExpanded ? (
-          <div className="prompt-preview-body">
-            {promptPreviewSections.length > 0 ? (
-              <div className="prompt-preview-sections">
-                {promptPreviewSections.map((section) => (
-                  <article className="prompt-preview-section" key={section.label}>
-                    <strong>{section.label}</strong>
-                    <pre>{section.lines.join("\n")}</pre>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="prompt-preview-empty-state">
-                <strong>Nothing queued yet</strong>
-                <p>Add a prompt or context to preview the final message.</p>
-              </div>
-            )}
-            <article className="prompt-preview-section prompt-preview-full">
-              <strong>Full generated prompt</strong>
-              <pre>{generatedPromptPreview || "Nothing will be sent yet. Add a prompt or context to build the final message."}</pre>
-            </article>
-          </div>
-        ) : null}
-      </div>
     </section>
   );
 }
@@ -1409,19 +1356,7 @@ export function ConsoleView({
                 >
                   <div className="terminal-stage-header">
                     <div>
-                      <p className="section-kicker">Output</p>
                       <h2>Codex terminal</h2>
-                      <p className="terminal-subcopy">
-                        {status.active
-                          ? sessionBanner.state === "awaiting-approval"
-                            ? "Codex paused for approval."
-                            : sessionBanner.state === "awaiting-input"
-                              ? "Codex is waiting for your next instruction."
-                              : isResultsWorkspaceState(workspaceState)
-                                ? "The latest session output stays here while you review it."
-                                : "Codex is working in this terminal."
-                          : "Start a session to turn this into the live working area."}
-                      </p>
                     </div>
                   </div>
                     <div ref={terminalContainerRef} className="terminal-panel" />

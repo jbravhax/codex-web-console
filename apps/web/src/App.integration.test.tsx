@@ -364,7 +364,7 @@ describe("App integration", () => {
   it("uses the left rail to switch between project and the unified workspace", async () => {
     const socket = renderApp();
 
-    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
+    expect(await screen.findByLabelText("Prompt")).toBeTruthy();
     await openProjectPage();
     expect(await screen.findByText("Project setup")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Project folder path"), {
@@ -376,7 +376,7 @@ describe("App integration", () => {
     expect(screen.queryByRole("button", { name: "Compose view" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Live run view" })).toBeNull();
     fireEvent.click(getMenuButton("Workspace"));
-    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
+    expect(await screen.findByLabelText("Prompt")).toBeTruthy();
     expect(screen.queryByText("Project setup")).toBeNull();
     expect(screen.getByText("Passed")).toBeTruthy();
 
@@ -487,12 +487,12 @@ describe("App integration", () => {
     expect(await screen.findByText(/choose the specific project folder you want codex to work in/i)).toBeTruthy();
   });
 
-  it("shows the generated prompt preview when expanded", async () => {
+  it("keeps the composer focused on prompt entry without preview controls", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
     expect(await screen.findByText("Codex terminal")).toBeTruthy();
     fireEvent.click(getMenuButton("Workspace"));
-    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
+    expect(await screen.findByLabelText("Prompt")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Prompt"), {
       target: {
@@ -500,11 +500,10 @@ describe("App integration", () => {
       }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
-
-    expect(await screen.findByText("Full generated prompt")).toBeTruthy();
-    expect(screen.getByText("User prompt text")).toBeTruthy();
-    expect(screen.getAllByText("Review this repository").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("What Codex will receive")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show preview" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy preview" })).toBeNull();
+    expect((screen.getByLabelText("Prompt") as HTMLTextAreaElement).value).toBe("Review this repository");
   });
 
   it("submits the prompt in one send action and shows waiting banner updates", async () => {
@@ -512,7 +511,7 @@ describe("App integration", () => {
     emitSessionStatus(socket, true, "/workspace/default-project");
     expect(await screen.findByText("Codex terminal")).toBeTruthy();
     fireEvent.click(getMenuButton("Workspace"));
-    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
+    expect(await screen.findByLabelText("Prompt")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Prompt"), {
       target: {
@@ -650,7 +649,7 @@ describe("App integration", () => {
     await waitFor(() => {
       expect(document.querySelector(".results-summary-card")).toBeTruthy();
     });
-    expect(screen.getByText(/The latest session output stays here while you review it/i)).toBeTruthy();
+    expect(screen.getByText("Codex terminal")).toBeTruthy();
 
     socket.emitClose({ code: 1006, reason: "server stopped" });
     expect((await screen.findAllByText("Disconnected")).length).toBeGreaterThanOrEqual(1);
@@ -814,15 +813,14 @@ describe("App integration", () => {
     expect((await screen.findAllByText("Last activity")).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("shows an empty preview state when nothing is queued", async () => {
+  it("does not render the removed prompt preview block", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
     expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
-
-    expect(await screen.findByText("Nothing queued yet")).toBeTruthy();
-    expect(screen.getByText("Nothing will be sent yet. Add a prompt or context to build the final message.")).toBeTruthy();
+    expect(screen.queryByText("What Codex will receive")).toBeNull();
+    expect(screen.queryByText("Nothing queued yet")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show preview" })).toBeNull();
   });
 
   it("shows intentional empty states in each utility mode", async () => {
@@ -1087,7 +1085,7 @@ describe("App integration", () => {
     });
     fireEvent.click(getMenuButton("Workspace"));
 
-    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
+    expect(await screen.findByLabelText("Prompt")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Context" })).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
@@ -1184,6 +1182,6 @@ describe("App integration", () => {
     await waitFor(() => {
       expect(document.querySelector(".results-summary-card")).toBeTruthy();
     });
-    expect(await screen.findByText("Guide Codex intentionally")).toBeTruthy();
+    expect(await screen.findByLabelText("Prompt")).toBeTruthy();
   });
 });
