@@ -250,12 +250,19 @@ export function ConsoleHeader({
       sessionActivity.disconnectedAt ||
       (sessionBanner.state === "idle" ? sessionActivity.startedAt : null)
   );
-  const showApprovalBadge = sessionBanner.state === "awaiting-approval";
   const showRunningIndicator =
     sessionBanner.state === "running" || sessionBanner.state === "starting" || sessionBanner.state === "awaiting-approval";
   const showPageBanner = isExceptionalBannerState || sessionBanner.state === "completed" || sessionBanner.state === "stopped";
   const serverLabel = connectionStateLabel === "Connected" ? "Local app online" : connectionStateLabel;
-  const sessionLabel = sessionBanner.state === "idle" ? "No session running" : sessionBanner.title;
+  const sessionLabel =
+    sessionBanner.state === "idle"
+      ? "No session running"
+      : sessionBanner.state === "starting" ||
+          sessionBanner.state === "running" ||
+          sessionBanner.state === "awaiting-approval" ||
+          sessionBanner.state === "awaiting-input"
+        ? "Codex is responding"
+        : sessionBanner.title;
   const showInlineSessionActions = sessionBanner.state === "stopped" || sessionBanner.state === "completed";
 
   return (
@@ -285,11 +292,6 @@ export function ConsoleHeader({
             <div className="top-status-chip">
               <span className="top-status-label">Duration</span>
               <strong>{liveDuration}</strong>
-            </div>
-          ) : null}
-          {showApprovalBadge ? (
-            <div className="top-status-chip top-status-approval">
-              <strong>Waiting for approval</strong>
             </div>
           ) : null}
         </div>

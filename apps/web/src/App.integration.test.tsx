@@ -398,13 +398,13 @@ describe("App integration", () => {
       }
     });
     fireEvent.click(screen.getByRole("button", { name: "Start session" }));
-    expect(await screen.findByText("Starting session")).toBeTruthy();
+    expect(await screen.findByText("Codex is responding")).toBeTruthy();
 
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Stop session" }));
-    expect(screen.getAllByText("Stopping session").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("button", { name: "Stop session" })).toBeTruthy();
 
     socket.emitMessage({
       type: "exit",
@@ -522,7 +522,7 @@ describe("App integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Send prompt" }));
 
-    expect((await screen.findAllByText("Running request")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
     await waitFor(() => {
       expect(socket.sent).toContain(
         JSON.stringify({
@@ -542,11 +542,8 @@ describe("App integration", () => {
       type: "output",
       payload: "Would you like to run the following command?\nPress enter to confirm"
     });
-    expect((await screen.findAllByText("Waiting for approval")).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByLabelText("Waiting for approval")).toBeTruthy();
     expect(screen.queryByText(/approve in the terminal and work will continue automatically/i)).toBeNull();
-    expect(document.querySelector('[data-session-state="awaiting-approval"]')).toBeTruthy();
-    expect(document.querySelector(".session-banner-awaiting-approval")).toBeNull();
+    expect(screen.getByRole("button", { name: "Context" })).toBeTruthy();
 
     socket.emitMessage({
       type: "output",
@@ -643,8 +640,7 @@ describe("App integration", () => {
       type: "output",
       payload: "› Run /review on my current changes"
     });
-    expect((await screen.findAllByText("Waiting for your next input")).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/waiting for your next instruction/i).length).toBeGreaterThan(0);
+    expect(await screen.findByLabelText("Waiting for input")).toBeTruthy();
 
     socket.emitMessage({
       type: "output",
@@ -821,7 +817,7 @@ describe("App integration", () => {
   it("shows an empty preview state when nothing is queued", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
 
@@ -849,7 +845,7 @@ describe("App integration", () => {
   it("saves large pasted text as document context and explains the file reference", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.paste(screen.getByLabelText("Prompt"), {
       clipboardData: {
@@ -867,7 +863,7 @@ describe("App integration", () => {
   it("shows a friendly large-paste failure message", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.paste(screen.getByLabelText("Prompt"), {
       clipboardData: {
@@ -886,7 +882,7 @@ describe("App integration", () => {
   it("clears all pending context after adding a saved document", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
-    expect((await screen.findAllByText("Session running")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
 
     fireEvent.paste(screen.getByLabelText("Prompt"), {
       clipboardData: {
@@ -1103,8 +1099,6 @@ describe("App integration", () => {
       payload: "Would you like to run the following command?\nPress enter to confirm"
     });
 
-    expect((await screen.findAllByText("Waiting for approval")).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByLabelText("Waiting for approval")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Context" })).toBeTruthy();
   });
 

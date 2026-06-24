@@ -1848,12 +1848,6 @@ body {
   background: currentColor;
 }
 
-.top-status-approval {
-  color: #b45309;
-  border-color: rgba(251, 191, 36, 0.28);
-  background: rgba(255, 247, 237, 0.96);
-}
-
 .top-status-actions {
   gap: 0.75rem;
 }
