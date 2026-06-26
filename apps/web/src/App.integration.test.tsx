@@ -582,7 +582,7 @@ describe("App integration", () => {
     });
   });
 
-  it("shows compact session status values in the left rail while a session is active", async () => {
+  it("shows the active session state in the primary workspace chrome", async () => {
     const socket = renderApp();
     emitSessionStatus(socket, true, "/workspace/default-project");
 
@@ -591,12 +591,9 @@ describe("App integration", () => {
       payload: "model:     gpt-5.5\nContext: 32% (64,000/200,000 tokens)\n5h limit: 18%\nweekly limit: 42%"
     });
 
-    expect(await screen.findByText("Session status")).toBeTruthy();
-    expect(screen.getByText("019eec5a")).toBeTruthy();
-    expect(screen.getByText("gpt-5.5")).toBeTruthy();
-    expect(screen.getByText("32% (64,000/200,000)")).toBeTruthy();
-    expect(screen.getByText("18%")).toBeTruthy();
-    expect(screen.getByText("42%")).toBeTruthy();
+    expect(await screen.findByText("Codex is responding")).toBeTruthy();
+    expect(screen.getByText("Running")).toBeTruthy();
+    expect(screen.getByText("Passed")).toBeTruthy();
   });
 
   it("validates an empty session id before attempting to continue", async () => {

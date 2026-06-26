@@ -71,10 +71,6 @@ import {
   buildWebSocketCloseDisplay,
   isStructuredSessionFailure
 } from "./session-diagnostics";
-import {
-  createEmptySessionRuntimeStatus,
-  deriveSessionRuntimeStatus
-} from "./session-status";
 import { friendlyUploadErrorMessage } from "./ui-messages";
 import { loadReadiness } from "./readiness";
 import {
@@ -101,6 +97,12 @@ const DEFAULT_CREATE_PROJECT_OPTIONS: CreateProjectOptions = {
 const INITIAL_TERMINAL_TEXT = "Codex CLI Web Console\r\nEnter one real project folder path and start a session.\r\n\r\n";
 const SESSION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_TERMINAL_REPLAY_CHARS = 50_000;
+
+function appendToCappedBuffer(current: string, nextChunk: string, maxChars: number): string {
+  const combined = `${current}${nextChunk}`;
+  return combined.length > maxChars ? combined.slice(-maxChars) : combined;
+}
 
 function formatDuration(durationMs: number | null): string {
   if (durationMs === null) {
@@ -158,7 +160,6 @@ export function App() {
     localSessionId: null,
     nativeSessionId: null
   });
-  const [sessionRuntimeStatus, setSessionRuntimeStatus] = useState(createEmptySessionRuntimeStatus);
   const [sessions, setSessions] = useState<SessionHistoryItem[]>([]);
   const [recentProjects, setRecentProjects] = useState<RecentProjectItem[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -226,15 +227,6 @@ export function App() {
     setRepoPickerMessage("");
   };
 
-  const refreshSessionRuntimeStatus = useCallback(
-    (sessionOverride?: SessionStatus) => {
-      setSessionRuntimeStatus((current) =>
-        deriveSessionRuntimeStatus(current, sessionOverride ?? statusRef.current, terminalBufferRef.current)
-      );
-    },
-    []
-  );
-
   const setCopyFeedback = (subject: string, result: Awaited<ReturnType<typeof copyRelativePath>>) => {
     setContextMessage(buildCopySuccessMessage(subject, result));
     setError("");
@@ -249,10 +241,9 @@ export function App() {
   }, []);
 
   const writeToTerminal = useCallback((text: string) => {
-    terminalBufferRef.current += text;
+    terminalBufferRef.current = appendToCappedBuffer(terminalBufferRef.current, text, MAX_TERMINAL_REPLAY_CHARS);
     terminalRef.current?.write(text);
-    refreshSessionRuntimeStatus();
-  }, [refreshSessionRuntimeStatus]);
+  }, []);
 
   const writeTerminalLine = useCallback((text: string) => {
     writeToTerminal(`${text}\r\n`);
@@ -264,7 +255,6 @@ export function App() {
     if (text) {
       terminalRef.current?.write(text);
     }
-    setSessionRuntimeStatus(createEmptySessionRuntimeStatus());
   }, []);
 
   const runReadinessChecks = async (pathToCheck: string) => {
@@ -308,30 +298,12 @@ export function App() {
   }, [status]);
 
   useEffect(() => {
-    refreshSessionRuntimeStatus(status);
-  }, [refreshSessionRuntimeStatus, status]);
-
-  useEffect(() => {
     sessionBannerRef.current = sessionBanner;
   }, [sessionBanner]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
-
-  useEffect(() => {
-    if (!status.active) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      refreshSessionRuntimeStatus();
-    }, 30 * 60 * 1000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [refreshSessionRuntimeStatus, status.active]);
 
   useLayoutEffect(() => {
     if (isResultsWorkspaceState(workspaceState)) {
@@ -569,7 +541,6 @@ export function App() {
       if (message.type === "status") {
         statusRef.current = message.payload;
         setStatus(message.payload);
-        refreshSessionRuntimeStatus(message.payload);
         if (message.payload.active) {
           setPage("workspace");
           setSessionActivity((current) => ({
@@ -635,7 +606,6 @@ export function App() {
         };
         statusRef.current = nextStatus;
         setStatus(nextStatus);
-        refreshSessionRuntimeStatus(nextStatus);
         const exitDisplay = buildUnexpectedExitDisplay(message.payload);
         const exitTimestamp = message.payload.endedAt ?? new Date().toISOString();
         const wasStopping = sessionBannerRef.current.state === "stopping" || sessionBannerRef.current.state === "stopped";
@@ -708,7 +678,6 @@ export function App() {
       };
       statusRef.current = nextStatus;
       setStatus(nextStatus);
-      refreshSessionRuntimeStatus(nextStatus);
       const closeTimestamp = new Date().toISOString();
       const closeCode = typeof closeEvent?.code === "number" ? closeEvent.code : 1006;
       const closeReason = typeof closeEvent?.reason === "string" && closeEvent.reason.trim().length > 0
@@ -1353,7 +1322,6 @@ export function App() {
         <ConsoleView
           projectControls={{
             status,
-            sessionRuntimeStatus,
             repoPath,
             onRepoPathChange: updateRepoPath,
             onChooseRepo: handleChooseRepo,

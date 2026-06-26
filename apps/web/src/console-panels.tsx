@@ -12,7 +12,6 @@ import type {
 } from "./app-types";
 import type { PendingContextItem } from "./pending-context-types";
 import { formatSessionBannerStateLabel, type SessionBanner } from "./session-banner";
-import { summarizeSessionId } from "./session-status";
 import { isResultsWorkspaceState } from "./workflow-phase";
 
 type PendingContextGroup = {
@@ -142,10 +141,6 @@ function buildReviewPageSummary(page: "context" | "transcript" | "changes"): str
     case "changes":
       return "Inspect project edits and diffs created during a Codex session.";
   }
-}
-
-function formatSessionStatusValue(value: string | null, fallback = "Unavailable"): string {
-  return value && value.trim().length > 0 ? value : fallback;
 }
 
 function isReviewPage(page: ConsolePage): page is "context" | "transcript" | "changes" {
@@ -364,7 +359,6 @@ function ProjectRail({
   recentProjectCount,
   readyPendingItemCount,
   hasActiveSession,
-  sessionRuntimeStatus,
   onStartSession,
   onStopSession
 }: {
@@ -377,7 +371,6 @@ function ProjectRail({
   recentProjectCount: number;
   readyPendingItemCount: number;
   hasActiveSession: boolean;
-  sessionRuntimeStatus: ProjectControlsProps["sessionRuntimeStatus"];
   onStartSession(): void;
   onStopSession(): void;
 }) {
@@ -437,34 +430,6 @@ function ProjectRail({
         )}
       </div>
 
-      {hasActiveSession ? (
-        <div className="session-runtime-status">
-          <strong className="session-runtime-status-title">Session status</strong>
-          <dl className="session-runtime-status-list">
-            <div>
-              <dt>Session</dt>
-              <dd>{summarizeSessionId(sessionRuntimeStatus.sessionId)}</dd>
-            </div>
-            <div>
-              <dt>Model</dt>
-              <dd>{formatSessionStatusValue(sessionRuntimeStatus.model)}</dd>
-            </div>
-            <div>
-              <dt>Context</dt>
-              <dd>{sessionRuntimeStatus.context.display}</dd>
-            </div>
-            <div>
-              <dt>5h limit</dt>
-              <dd>{sessionRuntimeStatus.limits.fiveHourDisplay}</dd>
-            </div>
-            <div>
-              <dt>Weekly limit</dt>
-              <dd>{sessionRuntimeStatus.limits.weeklyDisplay}</dd>
-            </div>
-          </dl>
-        </div>
-      ) : null}
-
       <div className="rail-action-dock">
         <button type="button" className="ghost rail-mini-action" onClick={() => onSelectPage("project")}>
           Open project
@@ -485,7 +450,6 @@ function ProjectRail({
 
 export function ProjectControls({
   status,
-  sessionRuntimeStatus,
   repoPath,
   onRepoPathChange,
   onChooseRepo,
@@ -1370,7 +1334,6 @@ export function ConsoleView({
             recentProjectCount={projectControls.recentProjects.length}
             readyPendingItemCount={pendingContextPanel.readyPendingItemCount}
             hasActiveSession={status.active}
-            sessionRuntimeStatus={projectControls.sessionRuntimeStatus}
             onStartSession={projectControls.onStartSession}
             onStopSession={projectControls.onStopSession}
           />

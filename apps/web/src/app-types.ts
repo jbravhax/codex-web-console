@@ -17,27 +17,6 @@ export type SessionStatus = {
   nativeSessionId: string | null;
 };
 
-export type SessionRuntimeStatus = {
-  sessionId: string | null;
-  model: string | null;
-  context: {
-    available: boolean;
-    usedTokens?: number;
-    maxTokens?: number;
-    percent?: number;
-    estimated?: boolean;
-    display: string;
-  };
-  limits: {
-    available: boolean;
-    fiveHourPercent?: number;
-    weeklyPercent?: number;
-    fiveHourDisplay: string;
-    weeklyDisplay: string;
-  };
-  updatedAt: string | null;
-};
-
 export type SessionActivitySummary = {
   startedAt: string | null;
   lastActivityAt: string | null;
@@ -140,7 +119,6 @@ export type ServerMessage =
 
 export type ProjectControlsProps = {
   status: SessionStatus;
-  sessionRuntimeStatus: SessionRuntimeStatus;
   repoPath: string;
   onRepoPathChange(nextPath: string): void;
   onChooseRepo(): void;
