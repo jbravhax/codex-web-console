@@ -15,6 +15,18 @@ describe("classifySessionStartupError", () => {
       category: "codex-not-found"
     });
   });
+
+  it("categorizes invalid native session ids", () => {
+    expect(classifySessionStartupError(new Error("Enter a valid Codex session UUID before continuing."))).toMatchObject({
+      category: "invalid-session-id"
+    });
+  });
+
+  it("categorizes missing native sessions", () => {
+    expect(classifySessionStartupError(new Error("No Codex session was found for 019eec5a-6dc8-7b71-b155-e96551e7c367."))).toMatchObject({
+      category: "session-not-found"
+    });
+  });
 });
 
 describe("classifySessionExit", () => {

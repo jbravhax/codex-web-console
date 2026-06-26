@@ -12,6 +12,7 @@ import type {
 } from "./app-types";
 import type { PendingContextItem } from "./pending-context-types";
 import { formatSessionBannerStateLabel, type SessionBanner } from "./session-banner";
+import { summarizeSessionId } from "./session-status";
 import { isResultsWorkspaceState } from "./workflow-phase";
 
 type PendingContextGroup = {
@@ -141,6 +142,10 @@ function buildReviewPageSummary(page: "context" | "transcript" | "changes"): str
     case "changes":
       return "Inspect project edits and diffs created during a Codex session.";
   }
+}
+
+function formatSessionStatusValue(value: string | null, fallback = "Unavailable"): string {
+  return value && value.trim().length > 0 ? value : fallback;
 }
 
 function isReviewPage(page: ConsolePage): page is "context" | "transcript" | "changes" {
@@ -359,9 +364,8 @@ function ProjectRail({
   recentProjectCount,
   readyPendingItemCount,
   hasActiveSession,
-  canContinueSession,
+  sessionRuntimeStatus,
   onStartSession,
-  onContinueSession,
   onStopSession
 }: {
   page: ConsoleViewProps["page"];
@@ -373,9 +377,8 @@ function ProjectRail({
   recentProjectCount: number;
   readyPendingItemCount: number;
   hasActiveSession: boolean;
-  canContinueSession: boolean;
+  sessionRuntimeStatus: ProjectControlsProps["sessionRuntimeStatus"];
   onStartSession(): void;
-  onContinueSession(): void;
   onStopSession(): void;
 }) {
   const menuItems: Array<{
@@ -434,6 +437,34 @@ function ProjectRail({
         )}
       </div>
 
+      {hasActiveSession ? (
+        <div className="session-runtime-status">
+          <strong className="session-runtime-status-title">Session status</strong>
+          <dl className="session-runtime-status-list">
+            <div>
+              <dt>Session</dt>
+              <dd>{summarizeSessionId(sessionRuntimeStatus.sessionId)}</dd>
+            </div>
+            <div>
+              <dt>Model</dt>
+              <dd>{formatSessionStatusValue(sessionRuntimeStatus.model)}</dd>
+            </div>
+            <div>
+              <dt>Context</dt>
+              <dd>{sessionRuntimeStatus.context.display}</dd>
+            </div>
+            <div>
+              <dt>5h limit</dt>
+              <dd>{sessionRuntimeStatus.limits.fiveHourDisplay}</dd>
+            </div>
+            <div>
+              <dt>Weekly limit</dt>
+              <dd>{sessionRuntimeStatus.limits.weeklyDisplay}</dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+
       <div className="rail-action-dock">
         <button type="button" className="ghost rail-mini-action" onClick={() => onSelectPage("project")}>
           Open project
@@ -441,11 +472,6 @@ function ProjectRail({
         <button type="button" className="ghost rail-mini-action" onClick={() => onSelectPage("project")}>
           New project
         </button>
-        {canContinueSession ? (
-          <button type="button" className="secondary rail-mini-action" onClick={onContinueSession} disabled={hasActiveSession}>
-            Continue session
-          </button>
-        ) : null}
         <button type="button" className="secondary rail-mini-action" onClick={onStartSession} disabled={!hasProjectPath || hasActiveSession}>
           Start session
         </button>
@@ -459,6 +485,7 @@ function ProjectRail({
 
 export function ProjectControls({
   status,
+  sessionRuntimeStatus,
   repoPath,
   onRepoPathChange,
   onChooseRepo,
@@ -468,8 +495,12 @@ export function ProjectControls({
   onCreateProjectOptionChange,
   onCreateProject,
   isCreatingProject,
+  onStartSession,
+  continueSessionId,
+  onContinueSessionIdChange,
   onContinueSession,
-  canContinueSession,
+  isContinuingSession,
+  onStopSession,
   connectionStateLabel,
   defaultRepoRoot,
   isLoadingSettings,
@@ -521,6 +552,32 @@ export function ProjectControls({
       {repoPickerMessage ? <p className="helper-text repo-picker-message">{repoPickerMessage}</p> : null}
       <p className="helper-text project-path-guidance">Paste a full path or try the browser picker when it works.</p>
       <div className="project-secondary-sections">
+        <CollapsibleSection
+          title="Continue session"
+          subtitle="Resume a saved Codex session with its Session ID."
+          className="collapsible-section-secondary"
+          defaultExpanded
+        >
+          <div className="project-create-card">
+            <label htmlFor="continue-session-id">Session ID</label>
+            <input
+              id="continue-session-id"
+              type="text"
+              value={continueSessionId}
+              onChange={(event) => onContinueSessionIdChange(event.target.value)}
+              placeholder="Enter Codex session UUID"
+              disabled={status.active || isContinuingSession}
+            />
+            <button
+              type="button"
+              className="secondary"
+              onClick={onContinueSession}
+              disabled={status.active || isContinuingSession}
+            >
+              {isContinuingSession ? "Continuing..." : "Continue"}
+            </button>
+          </div>
+        </CollapsibleSection>
         <CollapsibleSection
           title="Create new project"
           subtitle="Create a fresh folder from here when you need one."
@@ -613,14 +670,6 @@ export function ProjectControls({
           </div>
         </CollapsibleSection>
       </div>
-      {canContinueSession ? (
-        <div className="project-resume-row">
-          <button type="button" className="secondary" onClick={onContinueSession}>
-            Continue last session
-          </button>
-          <p className="helper-text">Resume the most recent Codex session saved for this project.</p>
-        </div>
-      ) : null}
       <CollapsibleSection
         title="Readiness"
         subtitle={readinessSummary}
@@ -1318,9 +1367,8 @@ export function ConsoleView({
             recentProjectCount={projectControls.recentProjects.length}
             readyPendingItemCount={pendingContextPanel.readyPendingItemCount}
             hasActiveSession={status.active}
-            canContinueSession={projectControls.canContinueSession}
+            sessionRuntimeStatus={projectControls.sessionRuntimeStatus}
             onStartSession={projectControls.onStartSession}
-            onContinueSession={projectControls.onContinueSession}
             onStopSession={projectControls.onStopSession}
           />
       </aside>

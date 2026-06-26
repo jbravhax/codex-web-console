@@ -13,6 +13,29 @@ export type SessionStatus = {
   active: boolean;
   repoPath: string | null;
   startedAt: string | null;
+  localSessionId: string | null;
+  nativeSessionId: string | null;
+};
+
+export type SessionRuntimeStatus = {
+  sessionId: string | null;
+  model: string | null;
+  context: {
+    available: boolean;
+    usedTokens?: number;
+    maxTokens?: number;
+    percent?: number;
+    estimated?: boolean;
+    display: string;
+  };
+  limits: {
+    available: boolean;
+    fiveHourPercent?: number;
+    weeklyPercent?: number;
+    fiveHourDisplay: string;
+    weeklyDisplay: string;
+  };
+  updatedAt: string | null;
 };
 
 export type SessionActivitySummary = {
@@ -116,6 +139,7 @@ export type ServerMessage =
 
 export type ProjectControlsProps = {
   status: SessionStatus;
+  sessionRuntimeStatus: SessionRuntimeStatus;
   repoPath: string;
   onRepoPathChange(nextPath: string): void;
   onChooseRepo(): void;
@@ -126,8 +150,10 @@ export type ProjectControlsProps = {
   onCreateProject(): void;
   isCreatingProject: boolean;
   onStartSession(): void;
+  continueSessionId: string;
+  onContinueSessionIdChange(nextSessionId: string): void;
   onContinueSession(): void;
-  canContinueSession: boolean;
+  isContinuingSession: boolean;
   onStopSession(): void;
   connectionStateLabel: string;
   defaultRepoRoot: string;

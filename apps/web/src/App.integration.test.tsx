@@ -237,7 +237,9 @@ function emitSessionStatus(socket: FakeWebSocket, active: boolean, repoPath: str
     payload: {
       active,
       repoPath,
-      startedAt: active ? "2026-06-22T21:10:00.000Z" : null
+      startedAt: active ? "2026-06-22T21:10:00.000Z" : null,
+      localSessionId: active ? "session-local-123456" : null,
+      nativeSessionId: active ? "019eec5a-6dc8-7b71-b155-e96551e7c367" : null
     }
   });
 }
@@ -551,21 +553,8 @@ describe("App integration", () => {
     expect((await screen.findAllByText("Codex is responding")).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("continues the latest resumable session for the selected project", async () => {
-    const socket = renderApp({
-      sessions: {
-        items: [
-          {
-            id: "session-continue",
-            repoPath: "/workspace/default-project",
-            startTime: "2026-06-22T21:10:00.000Z",
-            endTime: "2026-06-22T21:12:00.000Z",
-            durationMs: 120000,
-            resumeAvailable: true
-          }
-        ]
-      }
-    });
+  it("continues a saved session by explicit native session id", async () => {
+    const socket = renderApp();
 
     await openProjectPage();
     fireEvent.change(screen.getByLabelText("Project folder path"), {
@@ -573,18 +562,51 @@ describe("App integration", () => {
         value: "/workspace/default-project"
       }
     });
+    fireEvent.change(screen.getByLabelText("Session ID"), {
+      target: {
+        value: "019eec5a-6dc8-7b71-b155-e96551e7c367"
+      }
+    });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Continue session" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
       expect(socket.sent).toContain(
         JSON.stringify({
           type: "start",
           repoPath: "/workspace/default-project",
-          resumeLast: true
+          resumeLast: false,
+          resumeSessionId: "019eec5a-6dc8-7b71-b155-e96551e7c367"
         })
       );
     });
+  });
+
+  it("shows compact session status values in the left rail while a session is active", async () => {
+    const socket = renderApp();
+    emitSessionStatus(socket, true, "/workspace/default-project");
+
+    socket.emitMessage({
+      type: "output",
+      payload: "model:     gpt-5.5\nContext: 32% (64,000/200,000 tokens)\n5h limit: 18%\nweekly limit: 42%"
+    });
+
+    expect(await screen.findByText("Session status")).toBeTruthy();
+    expect(screen.getByText("019eec5a")).toBeTruthy();
+    expect(screen.getByText("gpt-5.5")).toBeTruthy();
+    expect(screen.getByText("32% (64,000/200,000)")).toBeTruthy();
+    expect(screen.getByText("18%")).toBeTruthy();
+    expect(screen.getByText("42%")).toBeTruthy();
+  });
+
+  it("validates an empty session id before attempting to continue", async () => {
+    const socket = renderApp();
+
+    await openProjectPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByText("Enter a Codex session ID before continuing.")).toBeTruthy();
+    expect(socket.sent.find((message) => message.includes("\"resumeSessionId\""))).toBeUndefined();
   });
 
   it("submits with Enter and keeps Shift+Enter available for a new line", async () => {

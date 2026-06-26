@@ -65,8 +65,14 @@ describe("attachSessionSocket", () => {
     const sessionManager = {
       getStatus: vi
         .fn()
-        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
-        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt }),
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null })
+        .mockReturnValueOnce({
+          active: true,
+          repoPath: "/workspace/project",
+          startedAt,
+          localSessionId: "session-local",
+          nativeSessionId: null
+        }),
       start: vi.fn().mockReturnValue({
         ptyProcess: fakePty,
         startedAt,
@@ -85,9 +91,21 @@ describe("attachSessionSocket", () => {
     attachSessionSocket(socket, "owner-1", sessionManager as never);
     socket.emitMessage({ type: "start", repoPath: "/workspace/project" });
 
-    expect(socket.sent[0]).toEqual({ type: "status", payload: { active: false, repoPath: null, startedAt: null } });
+    expect(socket.sent[0]).toEqual({
+      type: "status",
+      payload: { active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null }
+    });
     expect(sessionManager.start).toHaveBeenCalledWith("owner-1", "/workspace/project", { resumeLast: false });
-    expect(socket.sent[1]).toEqual({ type: "status", payload: { active: true, repoPath: "/workspace/project", startedAt } });
+    expect(socket.sent[1]).toEqual({
+      type: "status",
+      payload: {
+        active: true,
+        repoPath: "/workspace/project",
+        startedAt,
+        localSessionId: "session-local",
+        nativeSessionId: null
+      }
+    });
   });
 
   it("streams PTY output and sends exit plus inactive status", () => {
@@ -97,9 +115,15 @@ describe("attachSessionSocket", () => {
     const sessionManager = {
       getStatus: vi
         .fn()
-        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
-        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt })
-        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null }),
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null })
+        .mockReturnValueOnce({
+          active: true,
+          repoPath: "/workspace/project",
+          startedAt,
+          localSessionId: "session-local",
+          nativeSessionId: null
+        })
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null }),
       start: vi.fn().mockReturnValue({
         ptyProcess: fakePty,
         startedAt,
@@ -134,13 +158,16 @@ describe("attachSessionSocket", () => {
         resumeAvailable: true
       })
     });
-    expect(socket.sent).toContainEqual({ type: "status", payload: { active: false, repoPath: null, startedAt: null } });
+    expect(socket.sent).toContainEqual({
+      type: "status",
+      payload: { active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null }
+    });
   });
 
   it("delegates input, resize, stop, and close cleanup", () => {
     const socket = new FakeSocket();
     const sessionManager = {
-      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null, startedAt: null }),
+      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null }),
       start: vi.fn(),
       getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),
@@ -168,8 +195,14 @@ describe("attachSessionSocket", () => {
     const sessionManager = {
       getStatus: vi
         .fn()
-        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
-        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt }),
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null })
+        .mockReturnValueOnce({
+          active: true,
+          repoPath: "/workspace/project",
+          startedAt,
+          localSessionId: "session-local",
+          nativeSessionId: null
+        }),
       start: vi.fn().mockReturnValue({
         ptyProcess: fakePty,
         startedAt,
@@ -191,10 +224,53 @@ describe("attachSessionSocket", () => {
     expect(sessionManager.start).toHaveBeenCalledWith("owner-resume", "/workspace/project", { resumeLast: true });
   });
 
+  it("starts a resumed session when the websocket asks for a specific saved session id", () => {
+    const socket = new FakeSocket();
+    const fakePty = new FakePtyProcess();
+    const startedAt = "2026-06-22T21:00:00.000Z";
+    const sessionManager = {
+      getStatus: vi
+        .fn()
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null })
+        .mockReturnValueOnce({
+          active: true,
+          repoPath: "/workspace/project",
+          startedAt,
+          localSessionId: "session-local",
+          nativeSessionId: "019eec5a-6dc8-7b71-b155-e96551e7c367"
+        }),
+      start: vi.fn().mockReturnValue({
+        ptyProcess: fakePty,
+        startedAt,
+        repoPath: "/workspace/project",
+        gracefulStopRequested: false,
+        forcedStopAfterGracefulRequest: false
+      }),
+      getRecentOutput: vi.fn().mockReturnValue(""),
+      appendOutput: vi.fn(),
+      clear: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      stop: vi.fn()
+    };
+
+    attachSessionSocket(socket, "owner-resume-id", sessionManager as never);
+    socket.emitMessage({
+      type: "start",
+      repoPath: "/workspace/project",
+      resumeSessionId: "019eec5a-6dc8-7b71-b155-e96551e7c367"
+    });
+
+    expect(sessionManager.start).toHaveBeenCalledWith("owner-resume-id", "/workspace/project", {
+      resumeLast: false,
+      resumeSessionId: "019eec5a-6dc8-7b71-b155-e96551e7c367"
+    });
+  });
+
   it("rejects invalid and malformed websocket messages", () => {
     const socket = new FakeSocket();
     const sessionManager = {
-      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null, startedAt: null }),
+      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null }),
       start: vi.fn(),
       getRecentOutput: vi.fn().mockReturnValue(""),
       appendOutput: vi.fn(),
@@ -215,7 +291,7 @@ describe("attachSessionSocket", () => {
   it("sends structured startup failures for known start errors", () => {
     const socket = new FakeSocket();
     const sessionManager = {
-      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null, startedAt: null }),
+      getStatus: vi.fn().mockReturnValue({ active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null }),
       start: vi.fn().mockImplementation(() => {
         const error = new Error("spawn codex ENOENT") as Error & { code: string };
         error.code = "ENOENT";
@@ -246,8 +322,14 @@ describe("attachSessionSocket", () => {
     const sessionManager = {
       getStatus: vi
         .fn()
-        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null })
-        .mockReturnValueOnce({ active: true, repoPath: "/workspace/project", startedAt: "2026-06-22T21:05:00.000Z" }),
+        .mockReturnValueOnce({ active: false, repoPath: null, startedAt: null, localSessionId: null, nativeSessionId: null })
+        .mockReturnValueOnce({
+          active: true,
+          repoPath: "/workspace/project",
+          startedAt: "2026-06-22T21:05:00.000Z",
+          localSessionId: "session-local",
+          nativeSessionId: null
+        }),
       start: vi.fn().mockReturnValue({
         ptyProcess: fakePty,
         startedAt: "2026-06-22T21:05:00.000Z",

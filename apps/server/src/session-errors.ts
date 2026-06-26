@@ -1,4 +1,6 @@
 export type SessionFailureCategory =
+  | "invalid-session-id"
+  | "session-not-found"
   | "invalid-repo-path"
   | "repo-path-does-not-exist"
   | "repo-path-not-project"
@@ -47,6 +49,22 @@ export function classifySessionStartupError(error: unknown): SessionFailurePaylo
     return createFailure(
       "repo-path-does-not-exist",
       "That project folder does not exist yet. Create it first, then start Codex in that specific folder.",
+      technicalDetail
+    );
+  }
+
+  if (normalizedDetail.includes("valid codex session uuid")) {
+    return createFailure(
+      "invalid-session-id",
+      "Enter a valid Codex session UUID before continuing.",
+      technicalDetail
+    );
+  }
+
+  if (normalizedDetail.includes("no codex session was found for")) {
+    return createFailure(
+      "session-not-found",
+      "That Codex session could not be found on this machine. Check the Session ID and try again.",
       technicalDetail
     );
   }

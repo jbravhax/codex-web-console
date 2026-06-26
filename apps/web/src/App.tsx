@@ -71,6 +71,10 @@ import {
   buildWebSocketCloseDisplay,
   isStructuredSessionFailure
 } from "./session-diagnostics";
+import {
+  createEmptySessionRuntimeStatus,
+  deriveSessionRuntimeStatus
+} from "./session-status";
 import { friendlyUploadErrorMessage } from "./ui-messages";
 import { loadReadiness } from "./readiness";
 import {
@@ -95,6 +99,8 @@ const DEFAULT_CREATE_PROJECT_OPTIONS: CreateProjectOptions = {
 };
 
 const INITIAL_TERMINAL_TEXT = "Codex CLI Web Console\r\nEnter one real project folder path and start a session.\r\n\r\n";
+const SESSION_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function formatDuration(durationMs: number | null): string {
   if (durationMs === null) {
@@ -130,7 +136,13 @@ export function App() {
   const socketRef = useRef<WebSocket | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const statusRef = useRef<SessionStatus>({ active: false, repoPath: null, startedAt: null });
+  const statusRef = useRef<SessionStatus>({
+    active: false,
+    repoPath: null,
+    startedAt: null,
+    localSessionId: null,
+    nativeSessionId: null
+  });
   const sessionBannerRef = useRef<SessionBanner>(createInitialSessionBanner());
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const previousWorkspaceStateRef = useRef<WorkspaceState>("idle");
@@ -139,7 +151,14 @@ export function App() {
   const [activeView, setActiveView] = useState<"console" | "settings">("console");
   const [repoPath, setRepoPath] = useState("");
   const [promptText, setPromptText] = useState("");
-  const [status, setStatus] = useState<SessionStatus>({ active: false, repoPath: null, startedAt: null });
+  const [status, setStatus] = useState<SessionStatus>({
+    active: false,
+    repoPath: null,
+    startedAt: null,
+    localSessionId: null,
+    nativeSessionId: null
+  });
+  const [sessionRuntimeStatus, setSessionRuntimeStatus] = useState(createEmptySessionRuntimeStatus);
   const [sessions, setSessions] = useState<SessionHistoryItem[]>([]);
   const [recentProjects, setRecentProjects] = useState<RecentProjectItem[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -151,8 +170,10 @@ export function App() {
   const [contextMessage, setContextMessage] = useState("");
   const [repoPickerMessage, setRepoPickerMessage] = useState("");
   const [projectMessage, setProjectMessage] = useState("");
+  const [continueSessionId, setContinueSessionId] = useState("");
   const [createProjectOptions, setCreateProjectOptions] = useState<CreateProjectOptions>(DEFAULT_CREATE_PROJECT_OPTIONS);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [isContinuingSession, setIsContinuingSession] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(true);
@@ -194,10 +215,6 @@ export function App() {
     readyPendingItemCount
   });
   const latestSession = sessions[0] ?? null;
-  const resumableSession =
-    !status.active && repoPath.trim()
-      ? sessions.find((session) => session.repoPath === repoPath.trim() && session.resumeAvailable) ?? null
-      : null;
   const hasRepoChanges = Boolean(
     diffViewer.diff
       ? diffViewer.diff.stagedDiff.trim() || diffViewer.diff.unstagedDiff.trim()
@@ -208,6 +225,15 @@ export function App() {
     setProjectMessage("");
     setRepoPickerMessage("");
   };
+
+  const refreshSessionRuntimeStatus = useCallback(
+    (sessionOverride?: SessionStatus) => {
+      setSessionRuntimeStatus((current) =>
+        deriveSessionRuntimeStatus(current, sessionOverride ?? statusRef.current, terminalBufferRef.current)
+      );
+    },
+    []
+  );
 
   const setCopyFeedback = (subject: string, result: Awaited<ReturnType<typeof copyRelativePath>>) => {
     setContextMessage(buildCopySuccessMessage(subject, result));
@@ -225,7 +251,8 @@ export function App() {
   const writeToTerminal = useCallback((text: string) => {
     terminalBufferRef.current += text;
     terminalRef.current?.write(text);
-  }, []);
+    refreshSessionRuntimeStatus();
+  }, [refreshSessionRuntimeStatus]);
 
   const writeTerminalLine = useCallback((text: string) => {
     writeToTerminal(`${text}\r\n`);
@@ -237,6 +264,7 @@ export function App() {
     if (text) {
       terminalRef.current?.write(text);
     }
+    setSessionRuntimeStatus(createEmptySessionRuntimeStatus());
   }, []);
 
   const runReadinessChecks = async (pathToCheck: string) => {
@@ -280,12 +308,30 @@ export function App() {
   }, [status]);
 
   useEffect(() => {
+    refreshSessionRuntimeStatus(status);
+  }, [refreshSessionRuntimeStatus, status]);
+
+  useEffect(() => {
     sessionBannerRef.current = sessionBanner;
   }, [sessionBanner]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
+
+  useEffect(() => {
+    if (!status.active) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      refreshSessionRuntimeStatus();
+    }, 30 * 60 * 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [refreshSessionRuntimeStatus, status.active]);
 
   useLayoutEffect(() => {
     if (isResultsWorkspaceState(workspaceState)) {
@@ -521,7 +567,9 @@ export function App() {
       const message = JSON.parse(event.data) as ServerMessage;
 
       if (message.type === "status") {
+        statusRef.current = message.payload;
         setStatus(message.payload);
+        refreshSessionRuntimeStatus(message.payload);
         if (message.payload.active) {
           setPage("workspace");
           setSessionActivity((current) => ({
@@ -578,7 +626,16 @@ export function App() {
       }
 
       if (message.type === "exit") {
-        setStatus((current) => ({ active: false, repoPath: current.repoPath, startedAt: null }));
+        const nextStatus = {
+          active: false,
+          repoPath: statusRef.current.repoPath,
+          startedAt: null,
+          localSessionId: null,
+          nativeSessionId: null
+        };
+        statusRef.current = nextStatus;
+        setStatus(nextStatus);
+        refreshSessionRuntimeStatus(nextStatus);
         const exitDisplay = buildUnexpectedExitDisplay(message.payload);
         const exitTimestamp = message.payload.endedAt ?? new Date().toISOString();
         const wasStopping = sessionBannerRef.current.state === "stopping" || sessionBannerRef.current.state === "stopped";
@@ -642,7 +699,16 @@ export function App() {
 
     socket.onclose = (closeEvent) => {
       setConnectionState("disconnected");
-      setStatus((current) => ({ active: false, repoPath: current.repoPath, startedAt: null }));
+      const nextStatus = {
+        active: false,
+        repoPath: statusRef.current.repoPath,
+        startedAt: null,
+        localSessionId: null,
+        nativeSessionId: null
+      };
+      statusRef.current = nextStatus;
+      setStatus(nextStatus);
+      refreshSessionRuntimeStatus(nextStatus);
       const closeTimestamp = new Date().toISOString();
       const closeCode = typeof closeEvent?.code === "number" ? closeEvent.code : 1006;
       const closeReason = typeof closeEvent?.reason === "string" && closeEvent.reason.trim().length > 0
@@ -668,7 +734,7 @@ export function App() {
     };
   }, [writeTerminalLine, writeToTerminal]);
 
-  const beginSession = async (resumeLast = false) => {
+  const beginSession = async (options: { resumeLast?: boolean; resumeSessionId?: string } = {}) => {
     if (socketRef.current?.readyState !== WebSocket.OPEN) {
       const detail = "The local server connection is not ready yet.";
       setError(`${detail}\nTechnical details: websocket readyState was not OPEN when start was requested.`);
@@ -676,7 +742,9 @@ export function App() {
       return;
     }
 
-    const currentReadiness = await runReadinessChecks(repoPath);
+    const resumeSessionId = options.resumeSessionId?.trim() || undefined;
+    const pathToCheck = repoPath.trim() || settings.defaultRepoRoot.trim();
+    const currentReadiness = await runReadinessChecks(pathToCheck);
     if (!currentReadiness || !currentReadiness.canStart) {
       const failedChecks = currentReadiness?.items.filter((item) => item.status === "failed") ?? [];
       const firstFailure = failedChecks[0];
@@ -700,14 +768,15 @@ export function App() {
     });
     setSessionBanner((current) => reduceSessionBanner(current, { type: "start-requested", repoPath }));
     setPage("workspace");
-      resetTerminalBuffer();
-      socketRef.current?.send(
-        JSON.stringify({
-          type: "start",
-          repoPath,
-          resumeLast
-        })
-      );
+    resetTerminalBuffer();
+    socketRef.current?.send(
+      JSON.stringify({
+        type: "start",
+        repoPath,
+        resumeLast: options.resumeLast === true,
+        resumeSessionId
+      })
+    );
 
     const dimensions = fitAddonRef.current?.proposeDimensions();
     if (dimensions) {
@@ -722,11 +791,30 @@ export function App() {
   };
 
   const startSession = async () => {
-    await beginSession(false);
+    await beginSession();
   };
 
   const continueSession = async () => {
-    await beginSession(true);
+    const normalizedSessionId = continueSessionId.trim();
+    if (!normalizedSessionId) {
+      setError("Enter a Codex session ID before continuing.");
+      setPage("project");
+      return;
+    }
+
+    if (!SESSION_ID_PATTERN.test(normalizedSessionId)) {
+      setError("Enter a valid Codex session UUID before continuing.");
+      setPage("project");
+      return;
+    }
+
+    setIsContinuingSession(true);
+    try {
+      await beginSession({ resumeSessionId: normalizedSessionId });
+      setContinueSessionId("");
+    } finally {
+      setIsContinuingSession(false);
+    }
   };
 
   const stopSession = () => {
@@ -1265,6 +1353,7 @@ export function App() {
         <ConsoleView
           projectControls={{
             status,
+            sessionRuntimeStatus,
             repoPath,
             onRepoPathChange: updateRepoPath,
             onChooseRepo: handleChooseRepo,
@@ -1275,14 +1364,16 @@ export function App() {
               onCreateProject: () => {
                 void createProjectFolder();
               },
-              isCreatingProject,
-              onContinueSession: () => {
-                void continueSession();
-              },
-              canContinueSession: resumableSession !== null,
-              onStartSession: () => {
-                void startSession();
-              },
+            isCreatingProject,
+            onStartSession: () => {
+              void startSession();
+            },
+            continueSessionId,
+            onContinueSessionIdChange: setContinueSessionId,
+            onContinueSession: () => {
+              void continueSession();
+            },
+            isContinuingSession,
             onStopSession: stopSession,
             connectionStateLabel: formatConnectionState(connectionState),
             defaultRepoRoot: settings.defaultRepoRoot,

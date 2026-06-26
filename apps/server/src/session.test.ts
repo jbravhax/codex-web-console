@@ -32,11 +32,20 @@ class FakePtyProcess {
 }
 
 const spawnMock = vi.fn();
+const findCodexSessionMock = vi.fn((sessionId: string) => ({
+  id: sessionId
+}));
 
 vi.mock("node-pty", () => ({
   default: {
     spawn: spawnMock
   }
+}));
+
+vi.mock("./codex-sessions.js", () => ({
+  isCodexSessionId: (value: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim()),
+  findCodexSession: findCodexSessionMock
 }));
 
 const { SessionManager } = await import("./session.js");
@@ -65,6 +74,7 @@ let managersToCleanup: Array<InstanceType<typeof SessionManager>> = [];
 
 beforeEach(() => {
   spawnMock.mockReset();
+  findCodexSessionMock.mockClear();
   sessionDirsBefore = new Set(fs.readdirSync(SESSIONS_ROOT));
   createdProjectPaths = [];
   managersToCleanup = [];
@@ -97,12 +107,24 @@ describe("SessionManager", () => {
     managersToCleanup.push(manager);
 
     const session = manager.start("owner-1", repoPath);
-    expect(manager.getStatus("owner-1")).toEqual({ active: true, repoPath, startedAt: session.startedAt });
+    expect(manager.getStatus("owner-1")).toEqual({
+      active: true,
+      repoPath,
+      startedAt: session.startedAt,
+      localSessionId: session.sessionId,
+      nativeSessionId: null
+    });
 
     manager.appendOutput("owner-1", "hello from codex");
     manager.clear("owner-1");
 
-    expect(manager.getStatus("owner-1")).toEqual({ active: false, repoPath: null, startedAt: null });
+    expect(manager.getStatus("owner-1")).toEqual({
+      active: false,
+      repoPath: null,
+      startedAt: null,
+      localSessionId: null,
+      nativeSessionId: null
+    });
     expect(fs.existsSync(session.transcriptPath)).toBe(true);
     expect(fs.existsSync(session.rawTranscriptPath)).toBe(true);
     expect(fs.readFileSync(session.transcriptPath, "utf8")).toBe("hello from codex");
@@ -223,6 +245,41 @@ describe("SessionManager", () => {
     );
   });
 
+  it("starts Codex in native resume-by-id mode when requested", () => {
+    const repoPath = makeProjectDir("codex-web-session-");
+    createdProjectPaths.push(repoPath);
+    spawnMock.mockReturnValue(new FakePtyProcess());
+    const manager = new SessionManager(() => makeConfig());
+    managersToCleanup.push(manager);
+
+    manager.start("owner-resume-id", repoPath, {
+      resumeSessionId: "019eec5a-6dc8-7b71-b155-e96551e7c367"
+    });
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      "codex",
+      ["resume", "019eec5a-6dc8-7b71-b155-e96551e7c367"],
+      expect.objectContaining({
+        cwd: repoPath
+      })
+    );
+    expect(manager.getStatus("owner-resume-id").nativeSessionId).toBe("019eec5a-6dc8-7b71-b155-e96551e7c367");
+  });
+
+  it("rejects invalid native session ids before spawn", () => {
+    const repoPath = makeProjectDir("codex-web-session-");
+    createdProjectPaths.push(repoPath);
+    const manager = new SessionManager(() => makeConfig());
+    managersToCleanup.push(manager);
+
+    expect(() =>
+      manager.start("owner-invalid-resume", repoPath, {
+        resumeSessionId: "not-a-uuid"
+      })
+    ).toThrow("valid Codex session UUID");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a second active session for the same owner", () => {
     const repoPath = makeProjectDir("codex-web-session-");
     createdProjectPaths.push(repoPath);
@@ -251,8 +308,20 @@ describe("SessionManager", () => {
 
     expect(firstPty.kill).toHaveBeenCalledTimes(1);
     expect(secondPty.kill).toHaveBeenCalledTimes(1);
-    expect(manager.getStatus("owner-a")).toEqual({ active: false, repoPath: null, startedAt: null });
-    expect(manager.getStatus("owner-b")).toEqual({ active: false, repoPath: null, startedAt: null });
+    expect(manager.getStatus("owner-a")).toEqual({
+      active: false,
+      repoPath: null,
+      startedAt: null,
+      localSessionId: null,
+      nativeSessionId: null
+    });
+    expect(manager.getStatus("owner-b")).toEqual({
+      active: false,
+      repoPath: null,
+      startedAt: null,
+      localSessionId: null,
+      nativeSessionId: null
+    });
   });
 
   it("finalizes transcripts during stopAll and ignores late output", () => {

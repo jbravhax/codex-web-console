@@ -3,13 +3,16 @@ import os from "node:os";
 import path from "node:path";
 import pty, { type IPty } from "node-pty";
 import type { AppConfig } from "./config.js";
-import { validateRepoPath } from "./repo-paths.js";
+import { findCodexSession, isCodexSessionId } from "./codex-sessions.js";
+import { validateInspectableDirectoryPath, validateRepoPath } from "./repo-paths.js";
 import { stripTerminalSequences } from "./transcript-cleaner.js";
 
 export type SessionStatus = {
   active: boolean;
   repoPath: string | null;
   startedAt: string | null;
+  localSessionId: string | null;
+  nativeSessionId: string | null;
 };
 
 export type SessionListItem = {
@@ -32,11 +35,13 @@ type SessionMetadata = {
 
 type SessionStartOptions = {
   resumeLast?: boolean;
+  resumeSessionId?: string;
 };
 
 type ActiveSession = {
   ownerId: string;
   sessionId: string;
+  nativeSessionId: string | null;
   ptyProcess: IPty;
   repoPath: string;
   startedAt: string;
@@ -106,7 +111,9 @@ export class SessionManager {
     return {
       active: session !== undefined,
       repoPath: session?.repoPath ?? null,
-      startedAt: session?.startedAt ?? null
+      startedAt: session?.startedAt ?? null,
+      localSessionId: session?.sessionId ?? null,
+      nativeSessionId: session?.nativeSessionId ?? null
     };
   }
 
@@ -115,7 +122,23 @@ export class SessionManager {
       throw new Error("This browser session already has an active Codex process.");
     }
 
-    const validatedPath = validateRepoPath(repoPath);
+    const nativeSessionId = options.resumeSessionId?.trim() || null;
+    if (nativeSessionId && !isCodexSessionId(nativeSessionId)) {
+      throw new Error("Enter a valid Codex session UUID before continuing.");
+    }
+
+    if (nativeSessionId && !findCodexSession(nativeSessionId)) {
+      throw new Error(`No Codex session was found for ${nativeSessionId}.`);
+    }
+
+    const config = this.getConfig();
+    const repoPathCandidate =
+      repoPath.trim() ||
+      (nativeSessionId || options.resumeLast ? config.defaultRepoRoot.trim() : "");
+    const validatedPath =
+      nativeSessionId || options.resumeLast
+        ? validateInspectableDirectoryPath(repoPathCandidate)
+        : validateRepoPath(repoPathCandidate);
     const sessionId = createSessionId();
     const sessionDir = path.join(SESSIONS_ROOT, sessionId);
     const transcriptPath = path.join(sessionDir, "transcript.txt");
@@ -127,8 +150,11 @@ export class SessionManager {
     fs.mkdirSync(sessionDir, { recursive: true });
     fs.writeFileSync(transcriptPath, "", "utf8");
     fs.writeFileSync(rawTranscriptPath, "", "utf8");
-    const config = this.getConfig();
-    const commandArgs = options.resumeLast ? ["resume", "--last"] : [];
+    const commandArgs = nativeSessionId
+      ? ["resume", nativeSessionId]
+      : options.resumeLast
+        ? ["resume", "--last"]
+        : [];
     const ptyProcess = pty.spawn(config.codexExecutablePath, commandArgs, {
       name: "xterm-256color",
       cols: 120,
@@ -143,6 +169,7 @@ export class SessionManager {
     const session = {
       ownerId,
       sessionId,
+      nativeSessionId,
       ptyProcess,
       repoPath: validatedPath,
       startedAt,

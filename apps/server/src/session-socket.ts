@@ -33,7 +33,7 @@ export function attachSessionSocket(socket: SessionSocket, ownerId: string, sess
     }
 
     const typedMessage = message as
-      | { type: "start"; repoPath?: string; resumeLast?: boolean }
+      | { type: "start"; repoPath?: string; resumeLast?: boolean; resumeSessionId?: string }
       | { type: "input"; data?: string }
       | { type: "stop" }
       | { type: "resize"; cols?: number; rows?: number };
@@ -41,7 +41,8 @@ export function attachSessionSocket(socket: SessionSocket, ownerId: string, sess
     if (typedMessage.type === "start") {
       try {
         const session = sessionManager.start(ownerId, typedMessage.repoPath ?? "", {
-          resumeLast: typedMessage.resumeLast === true
+          resumeLast: typedMessage.resumeLast === true,
+          resumeSessionId: typedMessage.resumeSessionId
         });
 
         session.ptyProcess.onData((data) => {

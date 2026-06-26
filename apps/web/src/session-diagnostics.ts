@@ -1,4 +1,6 @@
 export type SessionFailureCategory =
+  | "invalid-session-id"
+  | "session-not-found"
   | "invalid-repo-path"
   | "repo-path-does-not-exist"
   | "repo-path-not-project"
