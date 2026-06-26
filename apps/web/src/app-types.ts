@@ -66,6 +66,7 @@ export type SessionHistoryItem = {
   startTime: string;
   endTime: string | null;
   durationMs: number | null;
+  nativeSessionId: string | null;
   resumeAvailable: boolean;
 };
 

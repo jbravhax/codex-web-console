@@ -15,6 +15,7 @@ const session: SessionHistoryItem = {
   startTime: "2026-06-21T12:00:00.000Z",
   endTime: "2026-06-21T12:05:00.000Z",
   durationMs: 300000,
+  nativeSessionId: "019dd81b-cdcd-7da1-8b5a-ee131f2f004a",
   resumeAvailable: false
 };
 
@@ -122,6 +123,7 @@ describe("session transcript helpers", () => {
 
     expect(markdown).toContain("# Codex Session Transcript");
     expect(markdown).toContain("- Repo path: /workspace/example-repo");
+    expect(markdown).toContain("- Session ID: 019dd81b-cdcd-7da1-8b5a-ee131f2f004a");
     expect(markdown).toContain("```text");
     expect(markdown).toContain("codex transcript output");
   });
@@ -146,13 +148,13 @@ describe("session transcript helpers", () => {
     } as unknown as typeof URL;
 
     downloadTranscriptText(session, "clean transcript", doc, urlFactory);
-    expect(anchor.download).toContain("session-123.txt");
+    expect(anchor.download).toContain("019dd81b-cdcd-7da1-8b5a-ee131f2f004a.txt");
     expect(anchor.click).toHaveBeenCalledTimes(1);
 
     downloadTranscriptMarkdown(session, "clean transcript", doc, urlFactory);
-    expect(anchor.download).toContain("session-123.md");
+    expect(anchor.download).toContain("019dd81b-cdcd-7da1-8b5a-ee131f2f004a.md");
 
     downloadRawTranscript(session, "\u001b[31mraw", doc, urlFactory);
-    expect(anchor.download).toContain("session-123-raw.txt");
+    expect(anchor.download).toContain("019dd81b-cdcd-7da1-8b5a-ee131f2f004a-raw.txt");
   });
 });

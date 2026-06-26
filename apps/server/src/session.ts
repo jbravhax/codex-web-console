@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import pty, { type IPty } from "node-pty";
 import type { AppConfig } from "./config.js";
-import { findCodexSession, isCodexSessionId } from "./codex-sessions.js";
+import { findCodexSession, findMostRecentCodexSession, isCodexSessionId } from "./codex-sessions.js";
 import { validateInspectableDirectoryPath, validateRepoPath } from "./repo-paths.js";
 import { stripTerminalSequences } from "./transcript-cleaner.js";
 
@@ -21,6 +21,7 @@ export type SessionListItem = {
   startTime: string;
   endTime: string | null;
   durationMs: number | null;
+  nativeSessionId: string | null;
   resumeAvailable: boolean;
 };
 
@@ -30,6 +31,7 @@ type SessionMetadata = {
   startTime: string;
   endTime: string | null;
   durationMs: number | null;
+  nativeSessionId: string | null;
   resumeAvailable: boolean;
 };
 
@@ -67,6 +69,11 @@ function createSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function extractNativeSessionId(text: string): string | null {
+  const match = text.match(/\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i);
+  return match?.[1] && isCodexSessionId(match[1]) ? match[1] : null;
+}
+
 function writeMetadata(metadataPath: string, metadata: SessionMetadata): void {
   fs.writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 }
@@ -84,6 +91,7 @@ function finalizeSession(session: ActiveSession): void {
     return;
   }
 
+  syncNativeSessionId(session);
   session.isFinalized = true;
   const endTime = new Date().toISOString();
   const durationMs = Math.max(0, new Date(endTime).getTime() - new Date(session.startedAt).getTime());
@@ -94,7 +102,38 @@ function finalizeSession(session: ActiveSession): void {
     startTime: session.startedAt,
     endTime,
     durationMs,
+    nativeSessionId: session.nativeSessionId,
     resumeAvailable: session.gracefulStopRequested && !session.forcedStopAfterGracefulRequest
+  });
+}
+
+function syncNativeSessionId(session: ActiveSession): void {
+  if (session.nativeSessionId && isCodexSessionId(session.nativeSessionId)) {
+    return;
+  }
+
+  const detectedFromOutput = extractNativeSessionId(session.recentOutput);
+  if (detectedFromOutput) {
+    session.nativeSessionId = detectedFromOutput;
+  } else {
+    const detectedFromCodexFiles = findMostRecentCodexSession(session.startedAt);
+    if (detectedFromCodexFiles) {
+      session.nativeSessionId = detectedFromCodexFiles.id;
+    }
+  }
+
+  if (!session.nativeSessionId) {
+    return;
+  }
+
+  const existingMetadata = readMetadata(session.metadataPath);
+  if (!existingMetadata || existingMetadata.nativeSessionId === session.nativeSessionId) {
+    return;
+  }
+
+  writeMetadata(session.metadataPath, {
+    ...existingMetadata,
+    nativeSessionId: session.nativeSessionId
   });
 }
 
@@ -189,6 +228,7 @@ export class SessionManager {
       startTime: startedAt,
       endTime: null,
       durationMs: null,
+      nativeSessionId,
       resumeAvailable: false
     });
 
@@ -246,11 +286,13 @@ export class SessionManager {
     fs.appendFileSync(session.rawTranscriptPath, data, "utf8");
     const cleanedOutput = stripTerminalSequences(data);
     if (!cleanedOutput) {
+      syncNativeSessionId(session);
       return;
     }
 
     session.recentOutput = `${session.recentOutput}${cleanedOutput}`.slice(-800);
     fs.appendFileSync(session.transcriptPath, cleanedOutput, "utf8");
+    syncNativeSessionId(session);
   }
 
   getRecentOutput(ownerId: string): string {
@@ -298,6 +340,7 @@ export class SessionManager {
         startTime: metadata.startTime,
         endTime: metadata.endTime,
         durationMs: metadata.durationMs,
+        nativeSessionId: metadata.nativeSessionId ?? null,
         resumeAvailable: metadata.resumeAvailable ?? false
       }));
   }

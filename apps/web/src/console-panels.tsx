@@ -1137,6 +1137,9 @@ export function SessionHistoryPanel({
             <div>
               <h3>Transcript</h3>
               <p className="history-repo">{transcriptViewer.session.repoPath}</p>
+              <p className="history-meta transcript-session-id">
+                <span>{transcriptViewer.session.nativeSessionId ?? "Session ID unavailable"}</span>
+              </p>
               <p className="history-meta">
                 <span>{new Date(transcriptViewer.session.startTime).toLocaleString()}</span>
                 <span>

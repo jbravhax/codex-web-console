@@ -933,14 +933,16 @@ describe("App integration", () => {
             repoPath: "/workspace/project-one",
             startTime: "2026-06-21T12:00:00.000Z",
             endTime: "2026-06-21T12:02:00.000Z",
-            durationMs: 120000
+            durationMs: 120000,
+            nativeSessionId: "019dd81b-cdcd-7da1-8b5a-ee131f2f004a"
           },
           {
             id: "session-2",
             repoPath: "/workspace/project-two",
             startTime: "2026-06-21T13:00:00.000Z",
             endTime: "2026-06-21T13:03:00.000Z",
-            durationMs: 180000
+            durationMs: 180000,
+            nativeSessionId: "019dd81b-cdcd-7da1-8b5a-ee131f2f004b"
           }
         ]
       }
@@ -952,6 +954,7 @@ describe("App integration", () => {
     fireEvent.click(transcriptButtons[0]);
     expect(await screen.findByText("Loading transcript...")).toBeTruthy();
     expect(await screen.findByText("session transcript text")).toBeTruthy();
+    expect(await screen.findByText("019dd81b-cdcd-7da1-8b5a-ee131f2f004a")).toBeTruthy();
 
     await openMenuPage("Transcript");
     fireEvent.click((await screen.findAllByRole("button", { name: "View transcript" }))[1]);
@@ -969,7 +972,8 @@ describe("App integration", () => {
             repoPath: "/workspace/project-one",
             startTime: "2026-06-21T12:00:00.000Z",
             endTime: "2026-06-21T12:02:00.000Z",
-            durationMs: 120000
+            durationMs: 120000,
+            nativeSessionId: "019dd81b-cdcd-7da1-8b5a-ee131f2f004a"
           }
         ]
       }
@@ -999,7 +1003,8 @@ describe("App integration", () => {
             repoPath: "/workspace/project-one",
             startTime: "2026-06-21T12:00:00.000Z",
             endTime: "2026-06-21T12:02:00.000Z",
-            durationMs: 120000
+            durationMs: 120000,
+            nativeSessionId: "019dd81b-cdcd-7da1-8b5a-ee131f2f004a"
           }
         ]
       }
@@ -1030,7 +1035,8 @@ describe("App integration", () => {
             repoPath: "/workspace/project-one",
             startTime: "2026-06-21T12:00:00.000Z",
             endTime: "2026-06-21T12:02:00.000Z",
-            durationMs: 120000
+            durationMs: 120000,
+            nativeSessionId: "019dd81b-cdcd-7da1-8b5a-ee131f2f004a"
           }
         ]
       }
@@ -1144,7 +1150,8 @@ describe("App integration", () => {
             repoPath: "/workspace/default-project",
             startTime: "2026-06-22T21:10:00.000Z",
             endTime: "2026-06-22T21:12:00.000Z",
-            durationMs: 120000
+            durationMs: 120000,
+            nativeSessionId: "019dd81b-cdcd-7da1-8b5a-ee131f2f004a"
           }
         ]
       }
@@ -1181,7 +1188,8 @@ describe("App integration", () => {
             repoPath: "/workspace/default-project",
             startTime: "2026-06-22T21:10:00.000Z",
             endTime: "2026-06-22T21:12:00.000Z",
-            durationMs: 120000
+            durationMs: 120000,
+            nativeSessionId: "019dd81b-cdcd-7da1-8b5a-ee131f2f004a"
           }
         ]
       }

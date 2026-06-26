@@ -45,7 +45,8 @@ vi.mock("node-pty", () => ({
 vi.mock("./codex-sessions.js", () => ({
   isCodexSessionId: (value: string) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim()),
-  findCodexSession: findCodexSessionMock
+  findCodexSession: findCodexSessionMock,
+  findMostRecentCodexSession: vi.fn(() => null)
 }));
 
 const { SessionManager } = await import("./session.js");
@@ -134,6 +135,7 @@ describe("SessionManager", () => {
       repoPath,
       endTime: expect.any(String),
       durationMs: expect.any(Number),
+      nativeSessionId: null,
       resumeAvailable: false
     });
     expect(manager.listSessions(1)[0]?.repoPath).toBe(repoPath);
@@ -156,6 +158,28 @@ describe("SessionManager", () => {
     expect(fs.readFileSync(session.rawTranscriptPath, "utf8")).toBe("\u001b[31mError\u001b[39m\n\u001b[2J\u001b[1;1HCreated README.md");
     expect(manager.getTranscript(session.sessionId)).toBe("Error\nCreated README.md");
     expect(manager.getRawTranscript(session.sessionId)).toBe("\u001b[31mError\u001b[39m\n\u001b[2J\u001b[1;1HCreated README.md");
+  });
+
+  it("stores the real native Codex session id after it appears in terminal output", () => {
+    const repoPath = makeProjectDir("codex-web-session-");
+    createdProjectPaths.push(repoPath);
+    const fakePty = new FakePtyProcess();
+    spawnMock.mockReturnValue(fakePty);
+    const manager = new SessionManager(() => makeConfig());
+    managersToCleanup.push(manager);
+
+    const session = manager.start("owner-native-session", repoPath);
+    manager.appendOutput(
+      "owner-native-session",
+      "Session:\n019dd81b-cdcd-7da1-8b5a-ee131f2f004a\n"
+    );
+    manager.clear("owner-native-session");
+
+    expect(manager.getStatus("owner-native-session").nativeSessionId).toBeNull();
+    expect(JSON.parse(fs.readFileSync(session.metadataPath, "utf8"))).toMatchObject({
+      nativeSessionId: "019dd81b-cdcd-7da1-8b5a-ee131f2f004a"
+    });
+    expect(manager.listSessions(1)[0]?.nativeSessionId).toBe("019dd81b-cdcd-7da1-8b5a-ee131f2f004a");
   });
 
   it("stores the final shortened line when terminal redraw output uses carriage returns", () => {

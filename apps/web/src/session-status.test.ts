@@ -38,18 +38,18 @@ describe("session status helpers", () => {
     });
   });
 
-  it("leaves unavailable values alone when nothing trustworthy is present", () => {
+  it("does not fall back to the local web session id when no Codex UUID is available", () => {
     const result = deriveSessionRuntimeStatus(createEmptySessionRuntimeStatus(), activeStatus, "Working...");
 
     expect(result.model).toBeNull();
     expect(result.context.display).toBe("Unavailable");
     expect(result.limits.fiveHourDisplay).toBe("Unavailable");
-    expect(result.sessionId).toBe("session-1234567890");
+    expect(result.sessionId).toBeNull();
   });
 
   it("summarizes ids for compact display", () => {
     expect(summarizeSessionId("019eec5a-6dc8-7b71-b155-e96551e7c367")).toBe("019eec5a");
     expect(summarizeSessionId("session-1234567890ab")).toBe("1234567890ab");
-    expect(summarizeSessionId(null)).toBe("—");
+    expect(summarizeSessionId(null)).toBe("-");
   });
 });

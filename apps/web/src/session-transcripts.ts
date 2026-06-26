@@ -65,7 +65,8 @@ function sanitizeFileNameSegment(input: string): string {
 
 export function buildTranscriptExportBaseName(session: SessionHistoryItem): string {
   const repoName = sanitizeFileNameSegment(session.repoPath.split(/[\\/]/).filter(Boolean).pop() ?? session.id);
-  return `${repoName}-${session.id}`;
+  const sessionIdentifier = sanitizeFileNameSegment(session.nativeSessionId ?? session.id);
+  return `${repoName}-${sessionIdentifier}`;
 }
 
 export function buildTranscriptMarkdown(session: SessionHistoryItem, transcript: string): string {
@@ -73,6 +74,7 @@ export function buildTranscriptMarkdown(session: SessionHistoryItem, transcript:
     "# Codex Session Transcript",
     "",
     `- Repo path: ${session.repoPath}`,
+    `- Session ID: ${session.nativeSessionId ?? "Unavailable"}`,
     `- Start time: ${new Date(session.startTime).toISOString()}`,
     `- End time: ${session.endTime ? new Date(session.endTime).toISOString() : "In progress"}`,
     `- Duration: ${session.durationMs === null ? "In progress" : `${Math.round(session.durationMs / 1000)}s`}`,

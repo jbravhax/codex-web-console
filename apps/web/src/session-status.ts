@@ -3,6 +3,10 @@ import type { SessionRuntimeStatus, SessionStatus } from "./app-types";
 const UUID_PATTERN =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
 
+function isUuid(value: string | null | undefined): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
+
 function matchFirst(text: string, patterns: RegExp[]): string | null {
   for (const pattern of patterns) {
     const match = text.match(pattern);
@@ -80,7 +84,7 @@ export function createEmptySessionRuntimeStatus(): SessionRuntimeStatus {
 
 export function summarizeSessionId(sessionId: string | null): string {
   if (!sessionId) {
-    return "—";
+    return "-";
   }
 
   if (UUID_PATTERN.test(sessionId)) {
@@ -110,7 +114,10 @@ export function deriveSessionRuntimeStatus(
   const parsedSessionId =
     matchFirst(terminalText, [/\bSession:\s*\r?\n\s*([0-9a-f-]{36})/i, /\bsession id:\s*([0-9a-f-]{36})/i]) ??
     null;
-  const sessionId = parsedSessionId || sessionStatus.nativeSessionId || sessionStatus.localSessionId || previous.sessionId;
+  const sessionId =
+    parsedSessionId ||
+    sessionStatus.nativeSessionId ||
+    (isUuid(previous.sessionId) ? previous.sessionId : null);
   const parsedContext = parseContext(terminalText) ?? previous.context;
   const parsedFiveHour = parseLimitDisplay(terminalText, "5h");
   const parsedWeekly = parseLimitDisplay(terminalText, "weekly");
